@@ -1,51 +1,36 @@
 # SAP Datasphere MCP Server
 # File: transports/stdio_server.py
-# Version: v1
+# Version: v7
 
-"""Entry point for running the MCP server over stdio."""
+"""STDIO entrypoint for the SAP Datasphere MCP server.
+
+This is the script behind the ``sap-datasphere-mcp`` console command.
+
+It:
+
+- creates a FastMCP server,
+- registers all Datasphere tools, and
+- runs the built-in stdio transport.
+"""
 
 from __future__ import annotations
 
-import logging
-import sys
+from mcp.server.fastmcp import FastMCP
 
-from mcp.server.fastmcp import FastMCP  # type: ignore[import]
-
-from ..config import DatasphereConfig
-from ..auth import OAuthClient
-from ..client import DatasphereClient
-from ..tools import register_all_tools
-
-
-logger = logging.getLogger(__name__)
-
-
-def _configure_logging() -> None:
-    """Configure basic logging to stderr.
-
-    Important: stdio MCP servers must not write to stdout.
-    """
-    logging.basicConfig(
-        level=logging.INFO,
-        stream=sys.stderr,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    )
+from ..tools import tasks
 
 
 def main() -> None:
-    """CLI entry point for stdio transport."""
-    _configure_logging()
-
-    config = DatasphereConfig.from_env()
-    oauth_client = OAuthClient(config=config)
-    datasphere_client = DatasphereClient(config=config, oauth=oauth_client)
-
+    """Synchronous entrypoint for console_scripts."""
     mcp = FastMCP("sap-datasphere-mcp")
-    register_all_tools(mcp, datasphere_client)
 
-    # Blocking call: listens for MCP messages on stdin/stdout
-    mcp.run(transport="stdio")
+    # Register MCP tools (ping, list_spaces, list_assets, preview_asset, …)
+    tasks.register_tools(mcp)
+
+    # Let FastMCP handle stdio + event loop setup.
+    mcp.run()
 
 
 if __name__ == "__main__":
     main()
+
