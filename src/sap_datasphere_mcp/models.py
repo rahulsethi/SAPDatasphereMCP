@@ -1,53 +1,50 @@
 # SAP Datasphere MCP Server
 # File: models.py
-# Version: v1
+# Version: v2
 
-"""Domain models used by the SAP Datasphere MCP Server."""
+"""Domain models used by the SAP Datasphere MCP server."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
 class Space:
-    """A logical Datasphere space."""
+    """Represents a Datasphere space as returned by the Catalog API."""
 
     id: str
     name: str
-    description: str | None = None
-    raw: Mapping[str, Any] | None = None
+    description: Optional[str] = None
+
+    # Raw JSON payload from the API, for debugging / advanced use.
+    raw: Optional[Dict[str, Any]] = None
 
 
 @dataclass
 class Asset:
-    """A catalog asset inside a space."""
+    """Represents a catalog asset inside a Datasphere space."""
 
     id: str
     name: str
-    space_id: str
-    type: str
-    description: str | None = None
-    raw: Mapping[str, Any] | None = None
+    type: Optional[str] = None
+    space_id: Optional[str] = None
+    description: Optional[str] = None
 
-
-@dataclass
-class Column:
-    """A column in an asset schema."""
-
-    name: str
-    type: str
-    nullable: bool = True
-    is_key: bool = False
-    description: str | None = None
+    # Raw JSON payload from the API, for debugging / advanced use.
+    raw: Optional[Dict[str, Any]] = None
 
 
 @dataclass
 class QueryResult:
-    """Tabular result returned from Datasphere."""
+    """Generic tabular result for data preview / queries."""
 
-    columns: Sequence[str]
-    rows: Sequence[Sequence[Any]]
+    columns: List[str]
+    rows: List[List[Any]]
+
+    # True if the result was truncated (e.g. due to row limits).
     truncated: bool = False
-    row_count: int | None = None
+
+    # Extra metadata – timings, row counts, etc.
+    meta: Optional[Dict[str, Any]] = None

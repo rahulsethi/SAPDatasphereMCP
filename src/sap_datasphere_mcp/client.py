@@ -1,22 +1,26 @@
 # SAP Datasphere MCP Server
 # File: client.py
-# Version: v1
+# Version: v7
 
 """High-level client for SAP Datasphere REST APIs.
 
-For Phase A this only defines the interface and a simple health check.
+Implements:
+- list_spaces() via the Catalog API
+- list_space_assets() via the Catalog API
+- preview_asset_data() via the relational Consumption API
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, List
+from typing import Any, Dict, Iterable, List
 
-import httpx  # noqa: F401  # used in later phases
+import httpx
+from httpx import HTTPStatusError, RequestError
 
 from .auth import OAuthClient
 from .config import DatasphereConfig
-from .models import Space, Asset, QueryResult
+from .models import Asset, QueryResult, Space
 
 
 @dataclass
@@ -26,33 +30,290 @@ class DatasphereClient:
     config: DatasphereConfig
     oauth: OAuthClient
 
+    # ------------------------------------------------------------------
+    # Basic health
+    # ------------------------------------------------------------------
     async def ping(self) -> bool:
         """Lightweight health check.
 
-        Right now this just checks that a tenant URL is configured.
+        For now this just checks that a tenant URL is configured.
         Later we may call a real Datasphere endpoint.
         """
         return bool(self.config.tenant_url)
 
-    # The following methods are placeholders; they will be implemented later.
-
+    # ------------------------------------------------------------------
+    # Catalog: spaces
+    # ------------------------------------------------------------------
     async def list_spaces(self) -> List[Space]:
-        """List all accessible spaces. Placeholder for Phase B."""
-        raise NotImplementedError("list_spaces will be implemented in Phase B")
+        """List all accessible Datasphere spaces via the catalog API."""
 
+        if not self.config.tenant_url:
+            raise RuntimeError(
+                "DATASPHERE_TENANT_URL is not set. "
+                "Please configure it before calling list_spaces()."
+            )
+
+        token = await self.oauth.get_access_token()
+
+        base_url = self.config.tenant_url.rstrip("/")
+        url = f"{base_url}/api/v1/dwc/catalog/spaces"
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as http_client:
+            try:
+                response = await http_client.get(url, headers=headers)
+            except RequestError as exc:
+                raise RuntimeError(
+                    f"Error calling Datasphere catalog API at '{url}': {exc}"
+                ) from exc
+
+        try:
+            response.raise_for_status()
+        except HTTPStatusError as exc:
+            status = response.status_code
+            body_preview = response.text[:500]
+            raise RuntimeError(
+                f"Failed to list spaces from '{url}' (HTTP {status}). "
+                f"Response snippet: {body_preview}"
+            ) from exc
+
+        data = response.json()
+        raw_spaces = data.get("value") if isinstance(data, dict) else data
+
+        spaces: List[Space] = []
+        if isinstance(raw_spaces, list):
+            for item in raw_spaces:
+                if not isinstance(item, dict):
+                    continue
+
+                space_id = (
+                    item.get("id")
+                    or item.get("technicalName")
+                    or item.get("name")
+                )
+                name = item.get("name") or space_id or "<unknown>"
+                description = item.get("description")
+
+                spaces.append(
+                    Space(
+                        id=str(space_id),
+                        name=str(name),
+                        description=description,
+                        raw=item,
+                    )
+                )
+
+        return spaces
+
+    # ------------------------------------------------------------------
+    # Catalog: assets
+    # ------------------------------------------------------------------
     async def list_space_assets(self, space_id: str) -> List[Asset]:
-        """List assets within a space. Placeholder for Phase B."""
-        raise NotImplementedError("list_space_assets will be implemented in Phase B")
+        """List catalog assets within a given Datasphere space.
 
+        Uses the Catalog API endpoint:
+            /api/v1/dwc/catalog/spaces('<space_id>')/assets
+        """
+
+        if not self.config.tenant_url:
+            raise RuntimeError(
+                "DATASPHERE_TENANT_URL is not set. "
+                "Please configure it before calling list_space_assets()."
+            )
+
+        token = await self.oauth.get_access_token()
+
+        base_url = self.config.tenant_url.rstrip("/")
+        key_space_id = space_id.replace("'", "''")
+        url = f"{base_url}/api/v1/dwc/catalog/spaces('{key_space_id}')/assets"
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as http_client:
+            try:
+                response = await http_client.get(url, headers=headers)
+            except RequestError as exc:
+                raise RuntimeError(
+                    f"Error calling Datasphere catalog API at '{url}': {exc}"
+                ) from exc
+
+        try:
+            response.raise_for_status()
+        except HTTPStatusError as exc:
+            status = response.status_code
+            body_preview = response.text[:500]
+            raise RuntimeError(
+                f"Failed to list assets for space '{space_id}' from '{url}' "
+                f"(HTTP {status}). Response snippet: {body_preview}"
+            ) from exc
+
+        data = response.json()
+        raw_assets = data.get("value") if isinstance(data, dict) else data
+
+        assets: List[Asset] = []
+        if isinstance(raw_assets, list):
+            for item in raw_assets:
+                if not isinstance(item, dict):
+                    continue
+
+                asset_id = (
+                    item.get("id")
+                    or item.get("technicalName")
+                    or item.get("name")
+                )
+                name = item.get("name") or asset_id or "<unknown>"
+                asset_type = (
+                    item.get("type")
+                    or item.get("assetType")
+                    or item.get("kind")
+                )
+                description = item.get("description")
+
+                assets.append(
+                    Asset(
+                        id=str(asset_id),
+                        name=str(name),
+                        type=str(asset_type) if asset_type is not None else None,
+                        space_id=space_id,
+                        description=description,
+                        raw=item,
+                    )
+                )
+
+        return assets
+
+    # ------------------------------------------------------------------
+    # Consumption: preview data (relational API)
+    # ------------------------------------------------------------------
     async def preview_asset_data(
         self,
         space_id: str,
         asset_name: str,
         top: int = 20,
+        select: Iterable[str] | None = None,
+        filter_expr: str | None = None,
+        order_by: str | None = None,
     ) -> QueryResult:
-        """Preview data from an asset. Placeholder for Phase C."""
-        raise NotImplementedError("preview_asset_data will be implemented in Phase C")
+        """Fetch a small sample of rows from a Datasphere asset.
 
+        Uses the Relational Consumption API endpoint:
+
+            /api/v1/dwc/consumption/relational/<space_id>/<asset_name>/<asset_name>
+
+        We add a $top parameter by default. If the service responds with a
+        400 complaining that $top is not supported, we retry once without it.
+
+        Not all assets are exposed via this endpoint; some may return 404 or
+        other errors even though they are visible in the catalog UI.
+        """
+
+        if not self.config.tenant_url:
+            raise RuntimeError(
+                "DATASPHERE_TENANT_URL is not set. "
+                "Please configure it before calling preview_asset_data()."
+            )
+
+        token = await self.oauth.get_access_token()
+
+        base_url = self.config.tenant_url.rstrip("/")
+        url = (
+            f"{base_url}/api/v1/dwc/consumption/relational/"
+            f"{space_id}/{asset_name}/{asset_name}"
+        )
+
+        params: Dict[str, Any] = {}
+        if top is not None:
+            params["$top"] = int(top)
+        if select:
+            params["$select"] = ",".join(select)
+        if filter_expr:
+            params["$filter"] = filter_expr
+        if order_by:
+            params["$orderby"] = order_by
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+        }
+
+        async with httpx.AsyncClient(timeout=60.0) as http_client:
+            try:
+                # First attempt (with $top if provided)
+                response = await http_client.get(
+                    url, headers=headers, params=params or None
+                )
+
+                # If the service says "$top is not supported", retry without it
+                if (
+                    response.status_code == 400
+                    and "Query option '$top' is not supported" in (response.text or "")
+                ):
+                    params.pop("$top", None)
+                    response = await http_client.get(
+                        url, headers=headers, params=params or None
+                    )
+
+            except RequestError as exc:
+                raise RuntimeError(
+                    f"Error calling Datasphere consumption API for asset "
+                    f"'{asset_name}' in space '{space_id}': {exc}"
+                ) from exc
+
+        try:
+            response.raise_for_status()
+        except HTTPStatusError as exc:
+            status = response.status_code
+            body_preview = response.text[:500]
+            raise RuntimeError(
+                f"Failed to preview data for asset '{asset_name}' in space "
+                f"'{space_id}' from '{url}' (HTTP {status}). "
+                f"Response snippet: {body_preview}"
+            ) from exc
+
+        data = response.json()
+        raw_rows = data.get("value") if isinstance(data, dict) else data
+
+        rows_dicts: List[Dict[str, Any]] = []
+        if isinstance(raw_rows, list):
+            rows_dicts = [r for r in raw_rows if isinstance(r, dict)]
+
+        if not rows_dicts:
+            return QueryResult(
+                columns=[],
+                rows=[],
+                truncated=False,
+                meta={
+                    "space_id": space_id,
+                    "asset_name": asset_name,
+                    "row_count": 0,
+                    "top": top,
+                },
+            )
+
+        # Derive column order from the first row.
+        columns = list(rows_dicts[0].keys())
+        rows = [[row.get(col) for col in columns] for row in rows_dicts]
+
+        truncated = top is not None and len(rows) >= top
+        meta = {
+            "space_id": space_id,
+            "asset_name": asset_name,
+            "row_count": len(rows_dicts),
+            "top": top,
+        }
+
+        return QueryResult(columns=columns, rows=rows, truncated=truncated, meta=meta)
+
+    # ------------------------------------------------------------------
+    # Future: richer query API
+    # ------------------------------------------------------------------
     async def query_relational(
         self,
         space_id: str,
@@ -63,5 +324,7 @@ class DatasphereClient:
         top: int = 100,
         skip: int = 0,
     ) -> QueryResult:
-        """Run a relational query. Placeholder for Phase C."""
-        raise NotImplementedError("query_relational will be implemented in Phase C")
+        """Run a relational query. Placeholder for a richer Phase C API."""
+        raise NotImplementedError(
+            "query_relational will be implemented in Phase C"
+        )
