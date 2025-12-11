@@ -1,6 +1,6 @@
 # SAP Datasphere MCP Server
 # File: client.py
-# Version: v7
+# Version: v8
 
 """High-level client for SAP Datasphere REST APIs.
 
@@ -8,6 +8,7 @@ Implements:
 - list_spaces() via the Catalog API
 - list_space_assets() via the Catalog API
 - preview_asset_data() via the relational Consumption API
+- query_relational() via the relational Consumption API
 """
 
 from __future__ import annotations
@@ -312,7 +313,7 @@ class DatasphereClient:
         return QueryResult(columns=columns, rows=rows, truncated=truncated, meta=meta)
 
     # ------------------------------------------------------------------
-    # Future: richer query API
+    # Relational query API (Phase C)
     # ------------------------------------------------------------------
     async def query_relational(
         self,
@@ -324,7 +325,115 @@ class DatasphereClient:
         top: int = 100,
         skip: int = 0,
     ) -> QueryResult:
-        """Run a relational query. Placeholder for a richer Phase C API."""
-        raise NotImplementedError(
-            "query_relational will be implemented in Phase C"
+        """Run a relational query using the same relational consumption API.
+
+        Supports:
+        - $top / $skip (paging)
+        - $filter (OData-style filter)
+        - $orderby (OData-style order by)
+        - $select (projection)
+        """
+
+        if not self.config.tenant_url:
+            raise RuntimeError(
+                "DATASPHERE_TENANT_URL is not set. "
+                "Please configure it before calling query_relational()."
+            )
+
+        token = await self.oauth.get_access_token()
+
+        base_url = self.config.tenant_url.rstrip("/")
+        url = (
+            f"{base_url}/api/v1/dwc/consumption/relational/"
+            f"{space_id}/{asset_name}/{asset_name}"
         )
+
+        params: Dict[str, Any] = {}
+        if top is not None:
+            params["$top"] = int(top)
+        if skip:
+            params["$skip"] = int(skip)
+        if select:
+            params["$select"] = ",".join(select)
+        if filter_expr:
+            params["$filter"] = filter_expr
+        if order_by:
+            params["$orderby"] = order_by
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+        }
+
+        async with httpx.AsyncClient(timeout=60.0) as http_client:
+            try:
+                response = await http_client.get(
+                    url, headers=headers, params=params or None
+                )
+
+                # Same $top retry logic as preview, just in case
+                if (
+                    response.status_code == 400
+                    and "Query option '$top' is not supported" in (response.text or "")
+                    and "$top" in params
+                ):
+                    params.pop("$top", None)
+                    response = await http_client.get(
+                        url, headers=headers, params=params or None
+                    )
+
+            except RequestError as exc:
+                raise RuntimeError(
+                    f"Error calling Datasphere consumption API for asset "
+                    f"'{asset_name}' in space '{space_id}' (query_relational): {exc}"
+                ) from exc
+
+        try:
+            response.raise_for_status()
+        except HTTPStatusError as exc:
+            status = response.status_code
+            body_preview = response.text[:500]
+            raise RuntimeError(
+                f"Failed to run relational query for asset '{asset_name}' in space "
+                f"'{space_id}' from '{url}' (HTTP {status}). "
+                f"Response snippet: {body_preview}"
+            ) from exc
+
+        data = response.json()
+        raw_rows = data.get("value") if isinstance(data, dict) else data
+
+        rows_dicts: List[Dict[str, Any]] = []
+        if isinstance(raw_rows, list):
+            rows_dicts = [r for r in raw_rows if isinstance(r, dict)]
+
+        if not rows_dicts:
+            return QueryResult(
+                columns=[],
+                rows=[],
+                truncated=False,
+                meta={
+                    "space_id": space_id,
+                    "asset_name": asset_name,
+                    "row_count": 0,
+                    "top": top,
+                    "skip": skip,
+                    "filter": filter_expr,
+                    "order_by": order_by,
+                },
+            )
+
+        columns = list(rows_dicts[0].keys())
+        rows = [[row.get(col) for col in columns] for row in rows_dicts]
+
+        truncated = top is not None and len(rows) >= top
+        meta = {
+            "space_id": space_id,
+            "asset_name": asset_name,
+            "row_count": len(rows_dicts),
+            "top": top,
+            "skip": skip,
+            "filter": filter_expr,
+            "order_by": order_by,
+        }
+
+        return QueryResult(columns=columns, rows=rows, truncated=truncated, meta=meta)
