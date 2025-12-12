@@ -9,6 +9,7 @@ description = "MCP server exposing SAP Datasphere tools and resources"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Rahul Sethi" }]
+license = { file = "LICENSE" }
 
 dependencies = [
   "mcp>=1.2.0",
