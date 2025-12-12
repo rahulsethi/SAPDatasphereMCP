@@ -16,3 +16,16 @@ __pycache__/
 set-datasphere-env.ps1
 .env
 .env.*
+
+# Local docs (not yet public)
+docs/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Test / tooling caches
+.pytest_cache/
+.mypy_cache/
+ruff_cache/
