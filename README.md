@@ -282,8 +282,8 @@ Example `mcpServers` entry (JSON, comments removed):
       "env": {
         "DATASPHERE_TENANT_URL": "https://your-tenant-id.eu10.hcs.cloud.sap",
         "DATASPHERE_OAUTH_TOKEN_URL": "https://your-uaa-domain/oauth/token",
-        "DATASPHERE_OAUTH_CLIENT_ID": "your-client-id",
-        "DATASPHERE_OAUTH_CLIENT_SECRET": "your-client-secret",
+        "DATASPHERE_CLIENT_ID": "your-client-id",
+        "DATASPHERE_CLIENT_SECRET": "your-client-secret",
         "DATASPHERE_VERIFY_TLS": "1"
       }
     }
