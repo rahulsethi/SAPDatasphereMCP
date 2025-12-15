@@ -1,6 +1,6 @@
 # SAP Datasphere MCP Server
 # File: tools/tasks.py
-# Version: v10
+# Version: v11
 #
 # NOTE: This module is the single place where we define "business logic"
 # that is exposed as MCP tools.  The MCP transports (stdio / http) simply
@@ -700,6 +700,88 @@ async def find_assets_with_column(
     }
 
 
+async def find_assets_by_column(
+    column_name: str,
+    space_id: Optional[str] = None,
+    limit: int = 100,
+    max_spaces: int = 20,
+    max_assets_per_space: int = 50,
+) -> Dict[str, Any]:
+    """Search across one or many spaces for assets exposing a column.
+
+    The match is case-insensitive and exact on column name. We use a tiny
+    preview per asset (top=1) and enforce safety caps on both the number
+    of spaces and the number of assets sampled per space.
+    """
+    client = _make_client()
+    target = column_name.lower()
+    results: List[Dict[str, Any]] = []
+    spaces_scanned = 0
+    assets_scanned = 0
+
+    async def scan_space(sid: str) -> None:
+        nonlocal spaces_scanned, assets_scanned, results
+        if len(results) >= limit:
+            return
+
+        assets = await client.list_space_assets(space_id=sid)
+        spaces_scanned += 1
+
+        checked_in_space = 0
+        for a in assets:
+            if checked_in_space >= max_assets_per_space:
+                break
+            if len(results) >= limit:
+                break
+            checked_in_space += 1
+
+            try:
+                qr = await client.preview_asset_data(
+                    space_id=sid,
+                    asset_name=a.id,
+                    top=1,
+                )
+            except RuntimeError:
+                # Not consumable / other error – skip quietly
+                continue
+
+            assets_scanned += 1
+            for col_name in qr.columns:
+                if col_name.lower() == target:
+                    results.append(
+                        {
+                            "space_id": sid,
+                            "asset_id": a.id,
+                            "asset_name": a.name,
+                            "column_name": col_name,
+                            "column_count": len(qr.columns),
+                        }
+                    )
+                    break
+
+    if space_id:
+        await scan_space(space_id)
+    else:
+        spaces = await client.list_spaces()
+        for s in spaces:
+            if spaces_scanned >= max_spaces or len(results) >= limit:
+                break
+            await scan_space(s.id)
+
+    return {
+        "space_id": space_id,
+        "column_name": column_name,
+        "limit": limit,
+        "results": results,
+        "stats": {
+            "spaces_scanned": spaces_scanned,
+            "assets_scanned": assets_scanned,
+            "max_spaces": max_spaces,
+            "max_assets_per_space": max_assets_per_space,
+        },
+    }
+
+
 async def profile_column(
     space_id: str,
     asset_name: str,
@@ -989,6 +1071,28 @@ def register_tools(server: Any) -> None:
             space_id=space_id,
             column_name=column_name,
             max_assets=max_assets,
+        )
+
+    # --- find_assets_by_column ----------------------------------------------
+
+    @server.tool(
+        name="datasphere_find_assets_by_column",
+        description="Search across one or many spaces for assets that expose "
+        "a given column name (case-insensitive, exact match).",
+    )
+    async def mcp_find_assets_by_column(
+        column_name: str,
+        space_id: Optional[str] = None,
+        limit: int = 100,
+        max_spaces: int = 20,
+        max_assets_per_space: int = 50,
+    ) -> Dict[str, Any]:
+        return await find_assets_by_column(
+            column_name=column_name,
+            space_id=space_id,
+            limit=limit,
+            max_spaces=max_spaces,
+            max_assets_per_space=max_assets_per_space,
         )
 
     # --- profile_column ------------------------------------------------------
