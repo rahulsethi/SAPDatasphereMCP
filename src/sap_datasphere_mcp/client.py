@@ -1,14 +1,16 @@
 # SAP Datasphere MCP Server
 # File: client.py
-# Version: v8
-
+# Version: v9
 """High-level client for SAP Datasphere REST APIs.
 
 Implements:
+
 - list_spaces() via the Catalog API
 - list_space_assets() via the Catalog API
 - preview_asset_data() via the relational Consumption API
 - query_relational() via the relational Consumption API
+- get_catalog_asset() for per-asset catalog metadata
+- get_relational_metadata() for relational OData $metadata
 """
 
 from __future__ import annotations
@@ -34,6 +36,7 @@ class DatasphereClient:
     # ------------------------------------------------------------------
     # Basic health
     # ------------------------------------------------------------------
+
     async def ping(self) -> bool:
         """Lightweight health check.
 
@@ -45,9 +48,9 @@ class DatasphereClient:
     # ------------------------------------------------------------------
     # Catalog: spaces
     # ------------------------------------------------------------------
+
     async def list_spaces(self) -> List[Space]:
         """List all accessible Datasphere spaces via the catalog API."""
-
         if not self.config.tenant_url:
             raise RuntimeError(
                 "DATASPHERE_TENANT_URL is not set. "
@@ -55,7 +58,6 @@ class DatasphereClient:
             )
 
         token = await self.oauth.get_access_token()
-
         base_url = self.config.tenant_url.rstrip("/")
         url = f"{base_url}/api/v1/dwc/catalog/spaces"
 
@@ -72,15 +74,16 @@ class DatasphereClient:
                     f"Error calling Datasphere catalog API at '{url}': {exc}"
                 ) from exc
 
-        try:
-            response.raise_for_status()
-        except HTTPStatusError as exc:
-            status = response.status_code
-            body_preview = response.text[:500]
-            raise RuntimeError(
-                f"Failed to list spaces from '{url}' (HTTP {status}). "
-                f"Response snippet: {body_preview}"
-            ) from exc
+            try:
+                response.raise_for_status()
+            except HTTPStatusError as exc:
+                status = response.status_code
+                body_preview = response.text[:500]
+                raise RuntimeError(
+                    "Failed to list spaces from "
+                    f"'{url}' (HTTP {status}). "
+                    f"Response snippet: {body_preview}"
+                ) from exc
 
         data = response.json()
         raw_spaces = data.get("value") if isinstance(data, dict) else data
@@ -96,7 +99,7 @@ class DatasphereClient:
                     or item.get("technicalName")
                     or item.get("name")
                 )
-                name = item.get("name") or space_id or "<unknown>"
+                name = item.get("name") or space_id or ""
                 description = item.get("description")
 
                 spaces.append(
@@ -113,13 +116,14 @@ class DatasphereClient:
     # ------------------------------------------------------------------
     # Catalog: assets
     # ------------------------------------------------------------------
+
     async def list_space_assets(self, space_id: str) -> List[Asset]:
         """List catalog assets within a given Datasphere space.
 
         Uses the Catalog API endpoint:
-            /api/v1/dwc/catalog/spaces('<space_id>')/assets
-        """
 
+        /api/v1/dwc/catalog/spaces('<space_id>')/assets
+        """
         if not self.config.tenant_url:
             raise RuntimeError(
                 "DATASPHERE_TENANT_URL is not set. "
@@ -127,10 +131,14 @@ class DatasphereClient:
             )
 
         token = await self.oauth.get_access_token()
-
         base_url = self.config.tenant_url.rstrip("/")
+
+        # Single quotes must be escaped for OData key literals.
         key_space_id = space_id.replace("'", "''")
-        url = f"{base_url}/api/v1/dwc/catalog/spaces('{key_space_id}')/assets"
+        url = (
+            f"{base_url}/api/v1/dwc/catalog/"
+            f"spaces('{key_space_id}')/assets"
+        )
 
         headers = {
             "Authorization": f"Bearer {token}",
@@ -145,15 +153,16 @@ class DatasphereClient:
                     f"Error calling Datasphere catalog API at '{url}': {exc}"
                 ) from exc
 
-        try:
-            response.raise_for_status()
-        except HTTPStatusError as exc:
-            status = response.status_code
-            body_preview = response.text[:500]
-            raise RuntimeError(
-                f"Failed to list assets for space '{space_id}' from '{url}' "
-                f"(HTTP {status}). Response snippet: {body_preview}"
-            ) from exc
+            try:
+                response.raise_for_status()
+            except HTTPStatusError as exc:
+                status = response.status_code
+                body_preview = response.text[:500]
+                raise RuntimeError(
+                    "Failed to list assets for space "
+                    f"'{space_id}' from '{url}' (HTTP {status}). "
+                    f"Response snippet: {body_preview}"
+                ) from exc
 
         data = response.json()
         raw_assets = data.get("value") if isinstance(data, dict) else data
@@ -169,7 +178,7 @@ class DatasphereClient:
                     or item.get("technicalName")
                     or item.get("name")
                 )
-                name = item.get("name") or asset_id or "<unknown>"
+                name = item.get("name") or asset_id or ""
                 asset_type = (
                     item.get("type")
                     or item.get("assetType")
@@ -181,7 +190,9 @@ class DatasphereClient:
                     Asset(
                         id=str(asset_id),
                         name=str(name),
-                        type=str(asset_type) if asset_type is not None else None,
+                        type=str(asset_type)
+                        if asset_type is not None
+                        else None,
                         space_id=space_id,
                         description=description,
                         raw=item,
@@ -190,9 +201,79 @@ class DatasphereClient:
 
         return assets
 
+    async def get_catalog_asset(self, space_id: str, asset_id: str) -> Dict[str, Any]:
+        """Get catalog metadata for a single asset in a space.
+
+        This uses the same Catalog API family as list_space_assets but
+        targets the single-asset endpoint:
+
+        /api/v1/dwc/catalog/spaces('<space_id>')/assets('<asset_id>')
+
+        The raw JSON payload is returned so higher layers (MCP tools) can
+        expose whichever fields are useful, such as:
+
+        - name / label / description
+        - type / semantic usage
+        - assetRelationalMetadataUrl / assetRelationalDataUrl
+        - assetAnalyticalMetadataUrl / assetAnalyticalDataUrl
+        """
+        if not self.config.tenant_url:
+            raise RuntimeError(
+                "DATASPHERE_TENANT_URL is not set. "
+                "Please configure it before calling get_catalog_asset()."
+            )
+
+        token = await self.oauth.get_access_token()
+        base_url = self.config.tenant_url.rstrip("/")
+
+        key_space_id = space_id.replace("'", "''")
+        key_asset_id = asset_id.replace("'", "''")
+
+        url = (
+            f"{base_url}/api/v1/dwc/catalog/"
+            f"spaces('{key_space_id}')/assets('{key_asset_id}')"
+        )
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as http_client:
+            try:
+                response = await http_client.get(url, headers=headers)
+            except RequestError as exc:
+                raise RuntimeError(
+                    "Error calling Datasphere catalog API for asset "
+                    f"'{asset_id}' in space '{space_id}' at '{url}': {exc}"
+                ) from exc
+
+            try:
+                response.raise_for_status()
+            except HTTPStatusError as exc:
+                status = response.status_code
+                body_preview = response.text[:500]
+                raise RuntimeError(
+                    "Failed to fetch catalog metadata for asset "
+                    f"'{asset_id}' in space '{space_id}' from "
+                    f"'{url}' (HTTP {status}). "
+                    f"Response snippet: {body_preview}"
+                ) from exc
+
+        data = response.json()
+        if not isinstance(data, dict):
+            raise RuntimeError(
+                "Unexpected response when fetching catalog asset "
+                f"'{asset_id}' in space '{space_id}': "
+                f"expected JSON object, got {type(data).__name__}."
+            )
+
+        return data
+
     # ------------------------------------------------------------------
     # Consumption: preview data (relational API)
     # ------------------------------------------------------------------
+
     async def preview_asset_data(
         self,
         space_id: str,
@@ -206,15 +287,15 @@ class DatasphereClient:
 
         Uses the Relational Consumption API endpoint:
 
-            /api/v1/dwc/consumption/relational/<space_id>/<asset_name>/<asset_name>
+        /api/v1/dwc/consumption/relational/<space_id>/<asset_name>/<asset_name>
 
         We add a $top parameter by default. If the service responds with a
-        400 complaining that $top is not supported, we retry once without it.
+        400 complaining that $top is not supported, we retry once without
+        it.
 
-        Not all assets are exposed via this endpoint; some may return 404 or
-        other errors even though they are visible in the catalog UI.
+        Not all assets are exposed via this endpoint; some may return 404
+        or other errors even though they are visible in the catalog UI.
         """
-
         if not self.config.tenant_url:
             raise RuntimeError(
                 "DATASPHERE_TENANT_URL is not set. "
@@ -222,7 +303,6 @@ class DatasphereClient:
             )
 
         token = await self.oauth.get_access_token()
-
         base_url = self.config.tenant_url.rstrip("/")
         url = (
             f"{base_url}/api/v1/dwc/consumption/relational/"
@@ -254,29 +334,30 @@ class DatasphereClient:
                 # If the service says "$top is not supported", retry without it
                 if (
                     response.status_code == 400
-                    and "Query option '$top' is not supported" in (response.text or "")
+                    and "Query option '$top' is not supported"
+                    in (response.text or "")
                 ):
                     params.pop("$top", None)
                     response = await http_client.get(
                         url, headers=headers, params=params or None
                     )
-
             except RequestError as exc:
                 raise RuntimeError(
-                    f"Error calling Datasphere consumption API for asset "
+                    "Error calling Datasphere consumption API for asset "
                     f"'{asset_name}' in space '{space_id}': {exc}"
                 ) from exc
 
-        try:
-            response.raise_for_status()
-        except HTTPStatusError as exc:
-            status = response.status_code
-            body_preview = response.text[:500]
-            raise RuntimeError(
-                f"Failed to preview data for asset '{asset_name}' in space "
-                f"'{space_id}' from '{url}' (HTTP {status}). "
-                f"Response snippet: {body_preview}"
-            ) from exc
+            try:
+                response.raise_for_status()
+            except HTTPStatusError as exc:
+                status = response.status_code
+                body_preview = response.text[:500]
+                raise RuntimeError(
+                    "Failed to preview data for asset "
+                    f"'{asset_name}' in space '{space_id}' from "
+                    f"'{url}' (HTTP {status}). "
+                    f"Response snippet: {body_preview}"
+                ) from exc
 
         data = response.json()
         raw_rows = data.get("value") if isinstance(data, dict) else data
@@ -301,8 +382,8 @@ class DatasphereClient:
         # Derive column order from the first row.
         columns = list(rows_dicts[0].keys())
         rows = [[row.get(col) for col in columns] for row in rows_dicts]
-
         truncated = top is not None and len(rows) >= top
+
         meta = {
             "space_id": space_id,
             "asset_name": asset_name,
@@ -310,11 +391,73 @@ class DatasphereClient:
             "top": top,
         }
 
-        return QueryResult(columns=columns, rows=rows, truncated=truncated, meta=meta)
+        return QueryResult(
+            columns=columns,
+            rows=rows,
+            truncated=truncated,
+            meta=meta,
+        )
+
+    async def get_relational_metadata(
+        self,
+        space_id: str,
+        asset_name: str,
+    ) -> str:
+        """Fetch the OData $metadata document for a relational asset.
+
+        This calls the relational Consumption API metadata endpoint:
+
+        /api/v1/dwc/consumption/relational/<space_id>/<asset_name>/$metadata
+
+        The raw XML (EDMX) payload is returned as a string so that
+        higher layers can parse it as needed (column list, labels, etc.).
+        """
+        if not self.config.tenant_url:
+            raise RuntimeError(
+                "DATASPHERE_TENANT_URL is not set. "
+                "Please configure it before calling get_relational_metadata()."
+            )
+
+        token = await self.oauth.get_access_token()
+        base_url = self.config.tenant_url.rstrip("/")
+        url = (
+            f"{base_url}/api/v1/dwc/consumption/relational/"
+            f"{space_id}/{asset_name}/$metadata"
+        )
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/xml",
+        }
+
+        async with httpx.AsyncClient(timeout=60.0) as http_client:
+            try:
+                response = await http_client.get(url, headers=headers)
+            except RequestError as exc:
+                raise RuntimeError(
+                    "Error calling Datasphere relational metadata endpoint "
+                    f"for asset '{asset_name}' in space '{space_id}' at "
+                    f"'{url}': {exc}"
+                ) from exc
+
+            try:
+                response.raise_for_status()
+            except HTTPStatusError as exc:
+                status = response.status_code
+                body_preview = response.text[:500]
+                raise RuntimeError(
+                    "Failed to fetch relational metadata for asset "
+                    f"'{asset_name}' in space '{space_id}' from "
+                    f"'{url}' (HTTP {status}). "
+                    f"Response snippet: {body_preview}"
+                ) from exc
+
+        return response.text
 
     # ------------------------------------------------------------------
-    # Relational query API (Phase C)
+    # Relational query API
     # ------------------------------------------------------------------
+
     async def query_relational(
         self,
         space_id: str,
@@ -325,15 +468,15 @@ class DatasphereClient:
         top: int = 100,
         skip: int = 0,
     ) -> QueryResult:
-        """Run a relational query using the same relational consumption API.
+        """Run a relational query using the relational consumption API.
 
         Supports:
+
         - $top / $skip (paging)
         - $filter (OData-style filter)
         - $orderby (OData-style order by)
         - $select (projection)
         """
-
         if not self.config.tenant_url:
             raise RuntimeError(
                 "DATASPHERE_TENANT_URL is not set. "
@@ -341,7 +484,6 @@ class DatasphereClient:
             )
 
         token = await self.oauth.get_access_token()
-
         base_url = self.config.tenant_url.rstrip("/")
         url = (
             f"{base_url}/api/v1/dwc/consumption/relational/"
@@ -374,30 +516,32 @@ class DatasphereClient:
                 # Same $top retry logic as preview, just in case
                 if (
                     response.status_code == 400
-                    and "Query option '$top' is not supported" in (response.text or "")
+                    and "Query option '$top' is not supported"
+                    in (response.text or "")
                     and "$top" in params
                 ):
                     params.pop("$top", None)
                     response = await http_client.get(
                         url, headers=headers, params=params or None
                     )
-
             except RequestError as exc:
                 raise RuntimeError(
-                    f"Error calling Datasphere consumption API for asset "
-                    f"'{asset_name}' in space '{space_id}' (query_relational): {exc}"
+                    "Error calling Datasphere consumption API for asset "
+                    f"'{asset_name}' in space '{space_id}' "
+                    f"(query_relational): {exc}"
                 ) from exc
 
-        try:
-            response.raise_for_status()
-        except HTTPStatusError as exc:
-            status = response.status_code
-            body_preview = response.text[:500]
-            raise RuntimeError(
-                f"Failed to run relational query for asset '{asset_name}' in space "
-                f"'{space_id}' from '{url}' (HTTP {status}). "
-                f"Response snippet: {body_preview}"
-            ) from exc
+            try:
+                response.raise_for_status()
+            except HTTPStatusError as exc:
+                status = response.status_code
+                body_preview = response.text[:500]
+                raise RuntimeError(
+                    "Failed to run relational query for asset "
+                    f"'{asset_name}' in space '{space_id}' from "
+                    f"'{url}' (HTTP {status}). "
+                    f"Response snippet: {body_preview}"
+                ) from exc
 
         data = response.json()
         raw_rows = data.get("value") if isinstance(data, dict) else data
@@ -424,8 +568,8 @@ class DatasphereClient:
 
         columns = list(rows_dicts[0].keys())
         rows = [[row.get(col) for col in columns] for row in rows_dicts]
-
         truncated = top is not None and len(rows) >= top
+
         meta = {
             "space_id": space_id,
             "asset_name": asset_name,
@@ -436,4 +580,9 @@ class DatasphereClient:
             "order_by": order_by,
         }
 
-        return QueryResult(columns=columns, rows=rows, truncated=truncated, meta=meta)
+        return QueryResult(
+            columns=columns,
+            rows=rows,
+            truncated=truncated,
+            meta=meta,
+        )
