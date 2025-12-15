@@ -1,6 +1,6 @@
 # SAP Datasphere MCP Server
 # File: tools/tasks.py
-# Version: v9
+# Version: v10
 #
 # NOTE: This module is the single place where we define "business logic"
 # that is exposed as MCP tools.  The MCP transports (stdio / http) simply
@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
 from typing import Any, Dict, Iterable, List, Optional
 
 from ..auth import OAuthClient
@@ -16,7 +17,7 @@ from ..config import DatasphereConfig
 
 
 # ---------------------------------------------------------------------------
-# Internal helper
+# Internal helpers
 # ---------------------------------------------------------------------------
 
 
@@ -25,6 +26,88 @@ def _make_client() -> DatasphereClient:
     cfg = DatasphereConfig.from_env()
     oauth = OAuthClient(config=cfg)
     return DatasphereClient(config=cfg, oauth=oauth)
+
+
+def _parse_relational_metadata_columns(
+    xml_text: str,
+    max_columns: int = 200,
+) -> List[Dict[str, Any]]:
+    """Parse an OData/EDMX $metadata document to extract column info.
+
+    This is intentionally tolerant of namespaces: we match on tag endings
+    like 'Schema', 'EntityType', 'Property', 'Key', 'PropertyRef' rather
+    than relying on specific prefixes.
+    """
+    root = ET.fromstring(xml_text)
+
+    # Find candidate Schema elements (any namespace).
+    schemas: List[ET.Element] = []
+    for elem in root.iter():
+        if elem.tag.endswith("Schema"):
+            schemas.append(elem)
+
+    if not schemas:
+        return []
+
+    # Choose the first EntityType with at least one Property.
+    entity_type: Optional[ET.Element] = None
+    for schema in schemas:
+        for child in schema:
+            if child.tag.endswith("EntityType"):
+                props = [p for p in child if p.tag.endswith("Property")]
+                if props:
+                    entity_type = child
+                    break
+        if entity_type is not None:
+            break
+
+    if entity_type is None:
+        return []
+
+    # Collect key property names from <Key><PropertyRef Name="..."/>.
+    key_props: set[str] = set()
+    for child in entity_type:
+        if child.tag.endswith("Key"):
+            for pref in child:
+                if pref.tag.endswith("PropertyRef"):
+                    name = pref.get("Name")
+                    if name:
+                        key_props.add(name)
+
+    # Collect column definitions from <Property>.
+    columns: List[Dict[str, Any]] = []
+    for prop in entity_type:
+        if not prop.tag.endswith("Property"):
+            continue
+
+        name = prop.get("Name")
+        if not name:
+            continue
+
+        type_name = prop.get("Type")
+        nullable_attr = prop.get("Nullable")
+        nullable: Optional[bool] = None
+        if nullable_attr is not None:
+            nullable = nullable_attr.lower() != "false"
+
+        is_key = name in key_props
+
+        # For now we do not attempt to infer 'role' (dimension/measure).
+        columns.append(
+            {
+                "name": name,
+                "type": type_name,
+                "nullable": nullable,
+                "is_key": is_key,
+                "role": None,
+                "raw": None,
+            }
+        )
+
+        if len(columns) >= max_columns:
+            break
+
+    return columns
 
 
 # ---------------------------------------------------------------------------
@@ -292,8 +375,145 @@ async def query_relational(
 
 
 # ---------------------------------------------------------------------------
-# Discovery helpers (low-hanging fruit)
+# Metadata & discovery helpers
 # ---------------------------------------------------------------------------
+
+
+async def get_asset_metadata(
+    space_id: str,
+    asset_name: str,
+) -> Dict[str, Any]:
+    """Fetch catalog metadata for a single asset.
+
+    Uses the Datasphere Catalog API single-asset endpoint. Returns a
+    friendly summary plus the raw payload so that callers (or LLMs) can
+    see all available fields.
+    """
+    client = _make_client()
+    raw = await client.get_catalog_asset(space_id=space_id, asset_id=asset_name)
+
+    asset_id = (
+        raw.get("id")
+        or raw.get("technicalName")
+        or raw.get("name")
+        or asset_name
+    )
+    name = raw.get("name") or raw.get("label") or asset_id
+    label = raw.get("label")
+    description = raw.get("description")
+    asset_type = (
+        raw.get("type")
+        or raw.get("assetType")
+        or raw.get("kind")
+    )
+
+    relational_metadata_url = raw.get("assetRelationalMetadataUrl") or raw.get(
+        "relationalMetadataUrl"
+    )
+    relational_data_url = raw.get("assetRelationalDataUrl") or raw.get(
+        "relationalDataUrl"
+    )
+    analytical_metadata_url = raw.get("assetAnalyticalMetadataUrl") or raw.get(
+        "analyticalMetadataUrl"
+    )
+    analytical_data_url = raw.get("assetAnalyticalDataUrl") or raw.get(
+        "analyticalDataUrl"
+    )
+
+    supports_relational = bool(relational_metadata_url or relational_data_url)
+    supports_analytical = bool(analytical_metadata_url or analytical_data_url)
+
+    return {
+        "space_id": space_id,
+        "asset_id": str(asset_id),
+        "name": str(name) if name is not None else None,
+        "label": label,
+        "description": description,
+        "type": str(asset_type) if asset_type is not None else None,
+        "supports_relational_queries": supports_relational,
+        "supports_analytical_queries": supports_analytical,
+        "urls": {
+            "relational_metadata": relational_metadata_url,
+            "relational_data": relational_data_url,
+            "analytical_metadata": analytical_metadata_url,
+            "analytical_data": analytical_data_url,
+        },
+        "raw": raw,
+    }
+
+
+async def list_columns(
+    space_id: str,
+    asset_name: str,
+    max_columns: int = 200,
+) -> Dict[str, Any]:
+    """List columns for an asset using relational metadata when possible.
+
+    We try to use the relational Consumption API $metadata endpoint to get
+    explicit column definitions (names, types, key flags, nullability).
+    If that fails, we fall back to a tiny data preview to infer column
+    names only.
+
+    The goal is to be fast and robust rather than perfectly complete.
+    """
+    client = _make_client()
+    columns: List[Dict[str, Any]] = []
+    meta: Dict[str, Any] = {
+        "space_id": space_id,
+        "asset_name": asset_name,
+        "source": None,
+    }
+
+    # First, try the relational metadata endpoint.
+    xml_text: Optional[str] = None
+    try:
+        xml_text = await client.get_relational_metadata(
+            space_id=space_id,
+            asset_name=asset_name,
+        )
+    except Exception:
+        xml_text = None
+
+    if xml_text:
+        try:
+            columns = _parse_relational_metadata_columns(
+                xml_text,
+                max_columns=max_columns,
+            )
+            if columns:
+                meta["source"] = "relational_metadata"
+        except Exception:
+            columns = []
+
+    # Fallback: derive column names from a tiny preview.
+    if not columns:
+        preview = await preview_asset(
+            space_id=space_id,
+            asset_name=asset_name,
+            top=1,
+        )
+        col_names = preview.get("columns") or []
+        for name in col_names[:max_columns]:
+            columns.append(
+                {
+                    "name": name,
+                    "type": None,
+                    "nullable": None,
+                    "is_key": False,
+                    "role": None,
+                    "raw": None,
+                }
+            )
+        meta["source"] = "sample_inference"
+
+    meta["column_count"] = len(columns)
+
+    return {
+        "space_id": space_id,
+        "asset_name": asset_name,
+        "columns": columns,
+        "meta": meta,
+    }
 
 
 async def search_assets(
@@ -686,6 +906,40 @@ def register_tools(server: Any) -> None:
             order_by=order_by,
             top=top,
             skip=skip,
+        )
+
+    # --- get_asset_metadata --------------------------------------------------
+
+    @server.tool(
+        name="datasphere_get_asset_metadata",
+        description="Get catalog metadata for a Datasphere asset, including "
+        "labels, type and exposure via relational/analytical APIs.",
+    )
+    async def mcp_get_asset_metadata(
+        space_id: str,
+        asset_name: str,
+    ) -> Dict[str, Any]:
+        return await get_asset_metadata(
+            space_id=space_id,
+            asset_name=asset_name,
+        )
+
+    # --- list_columns --------------------------------------------------------
+
+    @server.tool(
+        name="datasphere_list_columns",
+        description="List columns of a Datasphere asset using relational "
+        "metadata when available (with sample-based fallback).",
+    )
+    async def mcp_list_columns(
+        space_id: str,
+        asset_name: str,
+        max_columns: int = 200,
+    ) -> Dict[str, Any]:
+        return await list_columns(
+            space_id=space_id,
+            asset_name=asset_name,
+            max_columns=max_columns,
         )
 
     # --- search_assets -------------------------------------------------------
