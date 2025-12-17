@@ -1,6 +1,6 @@
 # SAP Datasphere MCP Server
 # File: tools/tasks.py
-# Version: v11
+# Version: v12
 #
 # NOTE: This module is the single place where we define "business logic"
 # that is exposed as MCP tools.  The MCP transports (stdio / http) simply
@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import math
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -788,14 +789,16 @@ async def profile_column(
     column_name: str,
     top: int = 100,
 ) -> Dict[str, Any]:
-    """Simple data-profiling helper for a single column.
+    """Sample-based profiling helper for a single column.
 
     Uses a preview sample (default 100 rows) to compute:
 
     - total / null / non-null counts
     - distinct count in the sample
     - a few example values
-    - very basic numeric stats (min, max, mean) when applicable
+    - basic numeric stats (min, max, mean, percentiles, IQR, outlier hints)
+    - basic categorical profiling (top values, frequencies)
+    - a coarse role hint (id / measure / dimension)
     """
     client = _make_client()
     qr = await client.preview_asset_data(
@@ -818,6 +821,7 @@ async def profile_column(
     non_null_values = [v for v in values if v is not None]
     null_count = total - len(non_null_values)
 
+    # Distinct values (for examples)
     distinct_values = []
     seen = set()
     for v in non_null_values:
@@ -827,6 +831,7 @@ async def profile_column(
         if len(distinct_values) >= 20:
             break
 
+    # Type frequencies
     type_counts: Dict[str, int] = {}
     for v in non_null_values:
         t = type(v).__name__
@@ -835,9 +840,10 @@ async def profile_column(
         type_counts.keys(), key=lambda t: type_counts[t], reverse=True
     )
 
+    # Numeric stats (sample-based)
     numeric_summary: Optional[Dict[str, float]] = None
-    # Treat int / float as numeric; try best-effort coercion for strings.
     numeric_like: List[float] = []
+
     for v in non_null_values:
         if isinstance(v, (int, float)):
             numeric_like.append(float(v))
@@ -845,16 +851,123 @@ async def profile_column(
             try:
                 numeric_like.append(float(str(v)))
             except Exception:
-                numeric_like = []
-                break
+                # If we hit non-coercible values, we simply skip them.
+                continue
 
     if numeric_like:
-        count = len(numeric_like)
+        numeric_like_sorted = sorted(numeric_like)
+        count = len(numeric_like_sorted)
+
+        def _percentile(p: float) -> Optional[float]:
+            if count == 0:
+                return None
+            if count == 1:
+                return numeric_like_sorted[0]
+            pos = (p / 100.0) * (count - 1)
+            lower = math.floor(pos)
+            upper = math.ceil(pos)
+            if lower == upper:
+                return numeric_like_sorted[lower]
+            frac = pos - lower
+            return (
+                numeric_like_sorted[lower]
+                + (numeric_like_sorted[upper] - numeric_like_sorted[lower]) * frac
+            )
+
+        p25 = _percentile(25.0)
+        p50 = _percentile(50.0)
+        p75 = _percentile(75.0)
+
+        iqr = None
+        lower_fence = None
+        upper_fence = None
+        outlier_count = None
+
+        if p25 is not None and p75 is not None:
+            iqr = p75 - p25
+            lower_fence = p25 - 1.5 * iqr
+            upper_fence = p75 + 1.5 * iqr
+            outlier_count = sum(
+                1
+                for x in numeric_like_sorted
+                if x < lower_fence or x > upper_fence
+            )
+
         numeric_summary = {
-            "min": min(numeric_like),
-            "max": max(numeric_like),
-            "mean": sum(numeric_like) / count if count else None,
+            "min": min(numeric_like_sorted),
+            "max": max(numeric_like_sorted),
+            "mean": sum(numeric_like_sorted) / count if count else None,
+            "p25": p25,
+            "p50": p50,
+            "p75": p75,
+            "iqr": iqr,
+            "lower_fence": lower_fence,
+            "upper_fence": upper_fence,
+            "outlier_count": outlier_count,
         }
+
+    # Categorical profiling (for low-cardinality columns)
+    categorical_summary: Optional[Dict[str, Any]] = None
+    if non_null_values:
+        freq: Dict[Any, int] = {}
+        for v in non_null_values:
+            freq[v] = freq.get(v, 0) + 1
+
+        unique_values = len(freq)
+        non_null_count = len(non_null_values)
+
+        # Only emit categorical stats when cardinality is reasonably small.
+        if unique_values <= 50 or unique_values <= max(1, non_null_count // 2):
+            # Sort by frequency descending, then value for determinism
+            sorted_items = sorted(
+                freq.items(),
+                key=lambda item: (-item[1], str(item[0])),
+            )
+            top_values = []
+            for value, count_v in sorted_items[:20]:
+                frac = count_v / non_null_count if non_null_count else 0.0
+                top_values.append(
+                    {
+                        "value": value,
+                        "count": count_v,
+                        "fraction": frac,
+                    }
+                )
+
+            concentration = (
+                top_values[0]["fraction"] if top_values else None
+            )
+
+            categorical_summary = {
+                "total_sampled": non_null_count,
+                "unique_values": unique_values,
+                "top_values": top_values,
+                "concentration": concentration,
+            }
+
+    # Role hint (id / measure / dimension) – very coarse, best-effort.
+    role_hint: Optional[str] = None
+    non_null_count = len(non_null_values)
+    distinct_non_null = len(set(non_null_values)) if non_null_values else 0
+    is_numeric = bool(numeric_like)
+
+    name_lower = column_name.lower()
+
+    if non_null_count > 0:
+        # Likely ID: name looks like an ID/key and high cardinality.
+        if any(
+            token in name_lower
+            for token in ("id", "_id", "key", "_key")
+        ) and distinct_non_null >= max(1, int(0.9 * non_null_count)):
+            role_hint = "id"
+        elif is_numeric:
+            # Numeric but not ID-like: treat as measure when high-ish cardinality.
+            if distinct_non_null > max(5, int(0.5 * non_null_count)):
+                role_hint = "measure"
+        else:
+            # Non-numeric: low/medium cardinality looks like a dimension.
+            if distinct_non_null <= max(50, int(0.7 * non_null_count)):
+                role_hint = "dimension"
 
     meta = {
         "space_id": space_id,
@@ -874,6 +987,8 @@ async def profile_column(
         "distinct_sampled": len(distinct_values),
         "example_values": distinct_values or None,
         "numeric_summary": numeric_summary,
+        "categorical_summary": categorical_summary,
+        "role_hint": role_hint,
         "meta": meta,
     }
 
@@ -1100,7 +1215,7 @@ def register_tools(server: Any) -> None:
     @server.tool(
         name="datasphere_profile_column",
         description="Profile a single column in an asset (nulls, distincts, "
-        "basic numeric stats) using a preview sample.",
+        "basic numeric & categorical stats) using a preview sample.",
     )
     async def mcp_profile_column(
         space_id: str,
