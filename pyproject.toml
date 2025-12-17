@@ -1,10 +1,14 @@
+# SAP Datasphere MCP Server
+# File: pyproject.toml
+# Version: v2
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "sap-datasphere-mcp"
-version = "0.1.0"
+name = "mcp-sap-datasphere-server"
+version = "0.2.0"
 description = "MCP server exposing SAP Datasphere tools and resources"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -26,3 +30,7 @@ dev = [
 
 [project.scripts]
 sap-datasphere-mcp = "sap_datasphere_mcp.transports.stdio_server:main"
+
+[tool.hatch.build.targets.wheel]
+# Explicitly tell Hatch which package directory to include in the wheel
+packages = ["src/sap_datasphere_mcp"]
