@@ -1,7 +1,3 @@
-<!-- SAP Datasphere MCP Server -->
-<!-- File: README.md -->
-<!-- Version: v4-public -->
-
 # SAP Datasphere MCP Server
 
 An experimental [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that lets AI agents talk to **SAP Datasphere**.
@@ -19,10 +15,11 @@ The server exposes a small, focused set of **read-only** tools to:
 **Current status: `v0.2.0` – Metadata & Diagnostics expansion (still preview).**  
 APIs may still change in future versions.
 
-The planned **PyPI distribution name** is:
+This project is available on **PyPI**:
 
-- `mcp-sap-datasphere-server`  
-  (See installation section – PyPI install will work once the package is actually published.)
+- Package: `mcp-sap-datasphere-server`  
+- Install: `pip install mcp-sap-datasphere-server`  
+- Project page: https://pypi.org/project/mcp-sap-datasphere-server/
 
 ---
 
@@ -225,30 +222,29 @@ This project is aimed at technical users who are comfortable with:
 
 ## 🚀 Installation
 
-### Option 1 – Install from PyPI *(once published)*
+### Option 1 – Install from PyPI *(recommended)*
 
-Planned distribution name:
+In any virtual environment where you want to use the MCP server:
 
 ```bash
 pip install mcp-sap-datasphere-server
 ```
 
-> The project is already configured with this name in `pyproject.toml`.  
-> Until the package is actually published to PyPI, use the GitHub or source install options below.
+This pulls the latest released version of the package from PyPI and installs:
 
-### Option 2 – Install directly from GitHub *(recommended for now)*
+- the `sap_datasphere_mcp` package,
+- the `sap-datasphere-mcp` console script, and
+- the required dependencies (`mcp`, `httpx`, `pydantic`, …).
 
-In any virtual environment where you want to use the MCP server:
+### Option 2 – Install directly from GitHub *(bleeding edge)*
+
+To track the latest `main` branch directly from GitHub:
 
 ```bash
 pip install "git+https://github.com/rahulsethi/SAPDatasphereMCP.git"
 ```
 
-This installs:
-
-- the `sap_datasphere_mcp` package,
-- the `sap-datasphere-mcp` console script, and
-- the required dependencies (`mcp`, `httpx`, `pydantic`, …).
+This gives you the current repository state, which may be ahead of the latest PyPI release.
 
 ### Option 3 – Clone the repo (recommended for contributors)
 
@@ -553,7 +549,7 @@ These are **not** implemented yet, but are on the wish-list:
   - Column list & column search across spaces  
   - Richer column profiling (percentiles, IQR, outlier hints, role hints)  
   - Diagnostics & identity helpers; mock-mode support  
-  - Packaging metadata prepared for distribution as `mcp-sap-datasphere-server` on PyPI
+  - Published on PyPI as `mcp-sap-datasphere-server`
 
 - **0.1.0 – first public preview**  
   - Basic connectivity, catalog, preview, schema, query, search & profiling tools.  
