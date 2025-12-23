@@ -1,6 +1,6 @@
 # SAP Datasphere MCP Server
 # File: client.py
-# Version: v9
+# Version: v10
 """High-level client for SAP Datasphere REST APIs.
 
 Implements:
@@ -66,7 +66,9 @@ class DatasphereClient:
             "Accept": "application/json",
         }
 
-        async with httpx.AsyncClient(timeout=30.0) as http_client:
+        async with httpx.AsyncClient(
+            timeout=30.0, verify=self.config.verify_tls
+        ) as http_client:
             try:
                 response = await http_client.get(url, headers=headers)
             except RequestError as exc:
@@ -94,11 +96,7 @@ class DatasphereClient:
                 if not isinstance(item, dict):
                     continue
 
-                space_id = (
-                    item.get("id")
-                    or item.get("technicalName")
-                    or item.get("name")
-                )
+                space_id = item.get("id") or item.get("technicalName") or item.get("name")
                 name = item.get("name") or space_id or ""
                 description = item.get("description")
 
@@ -135,17 +133,16 @@ class DatasphereClient:
 
         # Single quotes must be escaped for OData key literals.
         key_space_id = space_id.replace("'", "''")
-        url = (
-            f"{base_url}/api/v1/dwc/catalog/"
-            f"spaces('{key_space_id}')/assets"
-        )
+        url = f"{base_url}/api/v1/dwc/catalog/" f"spaces('{key_space_id}')/assets"
 
         headers = {
             "Authorization": f"Bearer {token}",
             "Accept": "application/json",
         }
 
-        async with httpx.AsyncClient(timeout=30.0) as http_client:
+        async with httpx.AsyncClient(
+            timeout=30.0, verify=self.config.verify_tls
+        ) as http_client:
             try:
                 response = await http_client.get(url, headers=headers)
             except RequestError as exc:
@@ -173,26 +170,16 @@ class DatasphereClient:
                 if not isinstance(item, dict):
                     continue
 
-                asset_id = (
-                    item.get("id")
-                    or item.get("technicalName")
-                    or item.get("name")
-                )
+                asset_id = item.get("id") or item.get("technicalName") or item.get("name")
                 name = item.get("name") or asset_id or ""
-                asset_type = (
-                    item.get("type")
-                    or item.get("assetType")
-                    or item.get("kind")
-                )
+                asset_type = item.get("type") or item.get("assetType") or item.get("kind")
                 description = item.get("description")
 
                 assets.append(
                     Asset(
                         id=str(asset_id),
                         name=str(name),
-                        type=str(asset_type)
-                        if asset_type is not None
-                        else None,
+                        type=str(asset_type) if asset_type is not None else None,
                         space_id=space_id,
                         description=description,
                         raw=item,
@@ -202,21 +189,7 @@ class DatasphereClient:
         return assets
 
     async def get_catalog_asset(self, space_id: str, asset_id: str) -> Dict[str, Any]:
-        """Get catalog metadata for a single asset in a space.
-
-        This uses the same Catalog API family as list_space_assets but
-        targets the single-asset endpoint:
-
-        /api/v1/dwc/catalog/spaces('<space_id>')/assets('<asset_id>')
-
-        The raw JSON payload is returned so higher layers (MCP tools) can
-        expose whichever fields are useful, such as:
-
-        - name / label / description
-        - type / semantic usage
-        - assetRelationalMetadataUrl / assetRelationalDataUrl
-        - assetAnalyticalMetadataUrl / assetAnalyticalDataUrl
-        """
+        """Get catalog metadata for a single asset in a space."""
         if not self.config.tenant_url:
             raise RuntimeError(
                 "DATASPHERE_TENANT_URL is not set. "
@@ -239,7 +212,9 @@ class DatasphereClient:
             "Accept": "application/json",
         }
 
-        async with httpx.AsyncClient(timeout=30.0) as http_client:
+        async with httpx.AsyncClient(
+            timeout=30.0, verify=self.config.verify_tls
+        ) as http_client:
             try:
                 response = await http_client.get(url, headers=headers)
             except RequestError as exc:
@@ -283,19 +258,7 @@ class DatasphereClient:
         filter_expr: str | None = None,
         order_by: str | None = None,
     ) -> QueryResult:
-        """Fetch a small sample of rows from a Datasphere asset.
-
-        Uses the Relational Consumption API endpoint:
-
-        /api/v1/dwc/consumption/relational/<space_id>/<asset_name>/<asset_name>
-
-        We add a $top parameter by default. If the service responds with a
-        400 complaining that $top is not supported, we retry once without
-        it.
-
-        Not all assets are exposed via this endpoint; some may return 404
-        or other errors even though they are visible in the catalog UI.
-        """
+        """Fetch a small sample of rows from a Datasphere asset."""
         if not self.config.tenant_url:
             raise RuntimeError(
                 "DATASPHERE_TENANT_URL is not set. "
@@ -324,23 +287,18 @@ class DatasphereClient:
             "Accept": "application/json",
         }
 
-        async with httpx.AsyncClient(timeout=60.0) as http_client:
+        async with httpx.AsyncClient(
+            timeout=60.0, verify=self.config.verify_tls
+        ) as http_client:
             try:
-                # First attempt (with $top if provided)
-                response = await http_client.get(
-                    url, headers=headers, params=params or None
-                )
+                response = await http_client.get(url, headers=headers, params=params or None)
 
-                # If the service says "$top is not supported", retry without it
                 if (
                     response.status_code == 400
-                    and "Query option '$top' is not supported"
-                    in (response.text or "")
+                    and "Query option '$top' is not supported" in (response.text or "")
                 ):
                     params.pop("$top", None)
-                    response = await http_client.get(
-                        url, headers=headers, params=params or None
-                    )
+                    response = await http_client.get(url, headers=headers, params=params or None)
             except RequestError as exc:
                 raise RuntimeError(
                     "Error calling Datasphere consumption API for asset "
@@ -379,7 +337,6 @@ class DatasphereClient:
                 },
             )
 
-        # Derive column order from the first row.
         columns = list(rows_dicts[0].keys())
         rows = [[row.get(col) for col in columns] for row in rows_dicts]
         truncated = top is not None and len(rows) >= top
@@ -391,27 +348,14 @@ class DatasphereClient:
             "top": top,
         }
 
-        return QueryResult(
-            columns=columns,
-            rows=rows,
-            truncated=truncated,
-            meta=meta,
-        )
+        return QueryResult(columns=columns, rows=rows, truncated=truncated, meta=meta)
 
     async def get_relational_metadata(
         self,
         space_id: str,
         asset_name: str,
     ) -> str:
-        """Fetch the OData $metadata document for a relational asset.
-
-        This calls the relational Consumption API metadata endpoint:
-
-        /api/v1/dwc/consumption/relational/<space_id>/<asset_name>/$metadata
-
-        The raw XML (EDMX) payload is returned as a string so that
-        higher layers can parse it as needed (column list, labels, etc.).
-        """
+        """Fetch the OData $metadata document for a relational asset."""
         if not self.config.tenant_url:
             raise RuntimeError(
                 "DATASPHERE_TENANT_URL is not set. "
@@ -430,7 +374,9 @@ class DatasphereClient:
             "Accept": "application/xml",
         }
 
-        async with httpx.AsyncClient(timeout=60.0) as http_client:
+        async with httpx.AsyncClient(
+            timeout=60.0, verify=self.config.verify_tls
+        ) as http_client:
             try:
                 response = await http_client.get(url, headers=headers)
             except RequestError as exc:
@@ -468,15 +414,7 @@ class DatasphereClient:
         top: int = 100,
         skip: int = 0,
     ) -> QueryResult:
-        """Run a relational query using the relational consumption API.
-
-        Supports:
-
-        - $top / $skip (paging)
-        - $filter (OData-style filter)
-        - $orderby (OData-style order by)
-        - $select (projection)
-        """
+        """Run a relational query using the relational consumption API."""
         if not self.config.tenant_url:
             raise RuntimeError(
                 "DATASPHERE_TENANT_URL is not set. "
@@ -507,23 +445,19 @@ class DatasphereClient:
             "Accept": "application/json",
         }
 
-        async with httpx.AsyncClient(timeout=60.0) as http_client:
+        async with httpx.AsyncClient(
+            timeout=60.0, verify=self.config.verify_tls
+        ) as http_client:
             try:
-                response = await http_client.get(
-                    url, headers=headers, params=params or None
-                )
+                response = await http_client.get(url, headers=headers, params=params or None)
 
-                # Same $top retry logic as preview, just in case
                 if (
                     response.status_code == 400
-                    and "Query option '$top' is not supported"
-                    in (response.text or "")
+                    and "Query option '$top' is not supported" in (response.text or "")
                     and "$top" in params
                 ):
                     params.pop("$top", None)
-                    response = await http_client.get(
-                        url, headers=headers, params=params or None
-                    )
+                    response = await http_client.get(url, headers=headers, params=params or None)
             except RequestError as exc:
                 raise RuntimeError(
                     "Error calling Datasphere consumption API for asset "
@@ -580,9 +514,4 @@ class DatasphereClient:
             "order_by": order_by,
         }
 
-        return QueryResult(
-            columns=columns,
-            rows=rows,
-            truncated=truncated,
-            meta=meta,
-        )
+        return QueryResult(columns=columns, rows=rows, truncated=truncated, meta=meta)
