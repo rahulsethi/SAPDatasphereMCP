@@ -1,14 +1,19 @@
 # SAP Datasphere MCP Server
 # File: cache.py
-# Version: v1
+# Version: v2
 
 """Small in-process TTL cache used for metadata-heavy calls (v0.3+).
 
 Design goals:
 - Simple (no external deps).
 - Safe defaults.
-- Diagnostics-friendly (hits/misses/size/evictions).
+- Diagnostics-friendly (hits/misses/size/evictions/expirations).
 - TTL + max entries are configurable via DatasphereConfig (env-driven).
+
+Notes:
+- Intended for small metadata payloads (catalog, columns, summaries), not large result sets.
+- TTL is per-entry.
+- LRU-ish eviction: oldest (least recently used) entries are evicted when max_entries is exceeded.
 """
 
 from __future__ import annotations
@@ -45,6 +50,9 @@ class TTLCache:
     @property
     def enabled(self) -> bool:
         return self.ttl_seconds > 0 and self.max_entries > 0
+
+    def __len__(self) -> int:
+        return len(self._store)
 
     def get(self, key: Hashable) -> Optional[Any]:
         """Return cached value if present and not expired, else None."""
@@ -109,6 +117,9 @@ class TTLCache:
 
     def clear(self) -> None:
         self._store.clear()
+
+    def reset_stats(self) -> None:
+        self._stats = CacheStats()
 
     def stats(self) -> Dict[str, Any]:
         return {

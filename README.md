@@ -1,3 +1,4 @@
+
 # SAP Datasphere MCP Server
 
 An experimental [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that lets AI agents talk to **SAP Datasphere**.
@@ -12,16 +13,19 @@ The server exposes a small, focused set of **read-only** tools to:
 - Profile columns with LLM-friendly summaries
 - Inspect metadata & diagnostics to understand “what is this thing?”
 
-**Current status: `v0.2.0` – Metadata & Diagnostics expansion (still preview).**  
+**Current status: `v0.3.0` – analytical querying + deterministic summaries, caching, and safer defaults (still preview).**  
 APIs may still change in future versions.
 
-This project is available on **PyPI**:
-
-- Package: `mcp-sap-datasphere-server`  
-- Install: `pip install mcp-sap-datasphere-server`  
-- Project page: https://pypi.org/project/mcp-sap-datasphere-server/
-
 ---
+
+## ✨ What’s new in v0.3.0 (on top of v0.2.0)
+
+- **Analytical querying**: `datasphere_query_analytical` (select / filter / order / paging) for assets exposed via the analytical consumption API.
+- **Deterministic summaries**: `datasphere_summarize_asset`, `datasphere_summarize_space`, `datasphere_summarize_column_profile`, and `datasphere_compare_assets_basic`.
+- **Metadata TTL cache**: faster repeated calls for discovery tools (configurable TTL + max entries).
+- **Configurable safety caps**: hard limits for row-returning tools and search results via env vars.
+- **OAuth/config hardening**: safer defaults (TLS verify on), better errors, and a Basic-auth token flow.
+- **Docs & packaging**: aligned tool names/docs and a cleaner release path.
 
 ## ✨ What’s new in v0.2.0 (on top of v0.1.0)
 
@@ -57,76 +61,50 @@ Everything remains **read-only** against your Datasphere tenant.
 
 ---
 
-## 🚦 Feature overview (v0.2.0)
+## 🚦 Feature overview (v0.3.0)
 
-This section describes the overall capabilities as of **v0.2.0**  
-(see the dedicated v0.1.0 section below for the original baseline).
+This section describes the main tool groups and how they fit together.
 
-All tools live in `sap_datasphere_mcp.tools.tasks` and are exposed via the MCP server.
+1. **Connectivity & diagnostics**
+   - `datasphere_ping`
+   - `datasphere_diagnostics`
+   - `datasphere_get_tenant_info`
+   - `datasphere_get_current_user`
+   - `datasphere_plugins_status` *(v0.3.0)*
 
-### 1. Health & connectivity
+2. **Spaces & assets**
+   - `datasphere_list_spaces`
+   - `datasphere_list_assets`
+   - **TTL cache** *(v0.3.0)* for common discovery calls (configurable via env vars)
 
-- Quick health check that configuration and OAuth are at least not obviously broken.
-- TLS verification can be relaxed for gnarly corporate proxies using `DATASPHERE_VERIFY_TLS=0` (only if you know what you’re doing).
-- Diagnostics tools provide a more structured view over configuration & connectivity (new in v0.2.0).
+3. **Data preview & querying**
+   - `datasphere_preview_asset` *(sample rows)*
+   - `datasphere_query_relational` *(OData-style relational queries)*
+   - `datasphere_query_analytical` *(v0.3.0, analytical consumption when exposed)*
+   - **Guardrails** *(v0.3.0)*: `$top` is clamped per-tool; responses include requested vs effective limits in `meta`
 
-### 2. Spaces & catalog
+4. **Metadata & discovery**
+   - `datasphere_get_asset_metadata`
+   - `datasphere_list_columns` *(prefers `$metadata`, falls back to sample inference)*
+   - `datasphere_search_assets`, `datasphere_find_assets_with_column`, `datasphere_find_assets_by_column`
 
-- List SAP Datasphere spaces visible to the OAuth client.
-- List catalog assets (tables/views/models) within a given space, including type and description.
-- New in v0.2.0: **asset-level metadata**, including which APIs (relational / analytical) are available and useful URLs.
+5. **Deterministic summaries & comparisons** *(v0.3.0)*
+   - `datasphere_summarize_asset`
+   - `datasphere_summarize_space`
+   - `datasphere_summarize_column_profile`
+   - `datasphere_compare_assets_basic`
 
-### 3. Data preview & relational queries
+6. **Profiling & quick EDA**
+   - `datasphere_describe_asset_schema`
+   - `datasphere_profile_column` *(numeric + categorical stats, plus a role hint when possible)*
 
-- Fetch small samples of rows from relational assets, with:
-  - column list,
-  - rows,
-  - `truncated` flag,
-  - a `meta` block carrying context (space, asset, query parameters).
-- Run simple relational queries via the Consumption API:
-  - `$select`, `$filter`, `$orderby`, `$top`, `$skip`.
-- Stays firmly in **simple relational consumption**; OLAP/analytical models are intentionally out of scope for now.
+All tools are intentionally **read-only** and designed to be safe to call from LLMs.
 
-### 4. Schema & column profiling
-
-- Describe an asset’s schema from a sample:
-  - column names,
-  - rough Python types,
-  - null counts,
-  - example values.
-- Profile a single column with:
-  - counts & distincts,
-  - numeric summary,
-  - categorical summary (v0.2.0),
-  - heuristic `role_hint` (v0.2.0).
-
-### 5. Metadata & discovery
-
-- Search assets by partial name / id / description / type across one or many spaces.
-- Summarise a space:
-  - total asset count,
-  - counts by type,
-  - small sample list of assets.
-- New in v0.2.0:
-  - list explicit columns using relational `$metadata`,
-  - find assets by column name within a space or across spaces.
-
-### 6. Diagnostics & identity (v0.2.0 additions)
-
-v0.2.0 introduces helper tools to:
-
-- surface environment & config details in a structured way,
-- check mock/live mode and connection health from within an MCP client,
-- expose basic “identity” context (technical user / mock vs real) that the agent can log or reason about.
-
-These tools are intentionally simple and designed to be safe to call from LLMs.
-
----
 
 ## ✨ Features (v0.1.0)
 
 This section reflects the **original feature set introduced in v0.1.0**.  
-All of these remain available in v0.2.0.
+All of these remain available in v0.3.0.
 
 All features are **read-only** against your Datasphere tenant.
 
@@ -177,7 +155,6 @@ All features are **read-only** against your Datasphere tenant.
 There are also a few **demo scripts** for local smoke-testing without an MCP client.
 
 ---
-
 ## 🧱 Architecture (high level)
 
 Very roughly:
@@ -222,31 +199,21 @@ This project is aimed at technical users who are comfortable with:
 
 ## 🚀 Installation
 
-### Option 1 – Install from PyPI *(recommended)*
+### Option 1 – Install directly from GitHub (recommended for users)
 
 In any virtual environment where you want to use the MCP server:
-
-```bash
-pip install mcp-sap-datasphere-server
-```
-
-This pulls the latest released version of the package from PyPI and installs:
-
-- the `sap_datasphere_mcp` package,
-- the `sap-datasphere-mcp` console script, and
-- the required dependencies (`mcp`, `httpx`, `pydantic`, …).
-
-### Option 2 – Install directly from GitHub *(bleeding edge)*
-
-To track the latest `main` branch directly from GitHub:
 
 ```bash
 pip install "git+https://github.com/rahulsethi/SAPDatasphereMCP.git"
 ```
 
-This gives you the current repository state, which may be ahead of the latest PyPI release.
+This installs:
 
-### Option 3 – Clone the repo (recommended for contributors)
+- the `sap_datasphere_mcp` package,
+- the `sap-datasphere-mcp` console script, and
+- the required dependencies (`mcp`, `httpx`, `pydantic`, …).
+
+### Option 2 – Clone the repo (recommended for contributors)
 
 ```bash
 git clone https://github.com/rahulsethi/SAPDatasphereMCP.git
@@ -422,13 +389,12 @@ After editing the config, restart Claude Desktop.
 The new MCP server should appear in the list of tools the model can call.
 
 ---
-
 ## 🔧 MCP tools – quick reference (with version tags)
 
 All tools live in `sap_datasphere_mcp.tools.tasks` and are registered on the
 MCP server under the names below.
 
-### Health & discovery
+**Health & discovery**
 
 - `datasphere_ping` *(since v0.1.0)*  
   Basic connectivity check – returns `{ "ok": bool }`.
@@ -443,7 +409,7 @@ MCP server under the names below.
 - `datasphere_get_current_user` *(added in v0.2.0)*  
   Describes the current Datasphere identity context (technical user vs mock mode) in a safe, high-level way.
 
-### Spaces & catalog
+**Spaces & catalog**
 
 - `datasphere_list_spaces` *(since v0.1.0)*  
   List visible Datasphere spaces.
@@ -455,7 +421,7 @@ MCP server under the names below.
   Fetch catalog metadata for a single asset: ids, name, label, description, type,
   relational/analytical exposure flags, useful URLs, plus raw payload.
 
-### Data preview & querying
+**Data preview & querying**
 
 - `datasphere_preview_asset` *(since v0.1.0)*  
   Fetch a small sample of rows from an asset:
@@ -465,7 +431,7 @@ MCP server under the names below.
   Relational query helper with:
   - `$select`, `$filter`, `$orderby`, `$top`, `$skip` reflected in `meta`.
 
-### Schema & profiling
+**Schema & profiling**
 
 - `datasphere_describe_asset_schema` *(since v0.1.0)*  
   Infer column-oriented schema from a sample: column names, rough Python types,
@@ -484,7 +450,7 @@ MCP server under the names below.
     - categorical summary for low-cardinality columns,
     - `role_hint` (`"id"`, `"measure"`, `"dimension"`).
 
-### Search & summaries
+**Search & summaries**
 
 - `datasphere_search_assets` *(since v0.1.0)*  
   Substring search on asset id, name, description, or type across one or many spaces.
@@ -529,35 +495,143 @@ are easy for LLMs (and humans) to reason about.
 
 ---
 
-## 🗺️ Roadmap (future ideas)
+## 📜 Changelog
 
-These are **not** implemented yet, but are on the wish-list:
+All notable changes to this project are documented here.
 
-- Analytical / cube-style query helpers for analytical models.
-- Higher-level RAG helpers (text embeddings + vector search on specific assets).
-- More advanced data-quality checks.
-- Better error classification and human-friendly error messages.
-- Optional caching to reduce repeated calls to the same assets.
-- Additional transports (e.g. HTTP) if needed by other MCP clients.
+
+### [0.3.0]
+### Added
+- Configurable guardrails for row-returning tools and search results (caps enforced in tool layer).
+- Metadata-focused TTL cache to reduce repeated backend calls for discovery/metadata tools.
+- Analytical querying tool: `datasphere_query_analytical`.
+- Deterministic summary tools:
+  - `datasphere_summarize_asset`
+  - `datasphere_summarize_space`
+  - `datasphere_summarize_column_profile`
+- Asset comparison helper: `datasphere_compare_assets_basic`.
+- Plugin observability tool: `datasphere_plugins_status` (also surfaced in diagnostics output).
+
+### Changed
+- Tool responses now include clearer `meta` fields (requested vs effective limits, cap applied flags) to make truncation explicit.
+- OAuth client hardened (client-credentials via HTTP Basic auth + token caching + clearer errors).
+- Config expanded for TLS verification toggle, caps, and cache settings.
+
+### Fixed
+- Normalized handling for optional query metadata to avoid `None`-shaped surprises in tool responses.
+
+
 
 ---
 
-## 📦 Versioning
+### 0.2.0 – Metadata & Diagnostics expansion
 
-- **0.2.0 – metadata & diagnostics (current)**  
-  - Catalog metadata tool (`datasphere_get_asset_metadata`)  
-  - Column list & column search across spaces  
-  - Richer column profiling (percentiles, IQR, outlier hints, role hints)  
-  - Diagnostics & identity helpers; mock-mode support  
-  - Published on PyPI as `mcp-sap-datasphere-server`
+> Status: in development / preview.
 
-- **0.1.0 – first public preview**  
-  - Basic connectivity, catalog, preview, schema, query, search & profiling tools.  
-  - Tested against a small sample dataset (`EMP_View_Test`) in a single tenant/space.
+### Added
 
-Expect breaking changes in the **0.x** series as the API evolves.
+- **Catalog metadata helper**
+  - `datasphere_get_asset_metadata` to fetch labels, descriptions, type and
+    relational/analytical exposure flags for a single asset, plus raw payload.
+
+- **Column-level introspection**
+  - `datasphere_list_columns` to list columns using relational `$metadata`
+    (EDMX/XML) when available, with preview-based fallback.
+
+- **Column search across spaces**
+  - `datasphere_find_assets_with_column` to find assets exposing a given column
+    in a single space.
+  - `datasphere_find_assets_by_column` to search across multiple spaces with
+    limits on spaces and assets scanned.
+
+- **Richer column profiling**
+  - Extended `datasphere_profile_column` with:
+    - numeric percentiles (p25, p50, p75),
+    - IQR and Tukey-style fences,
+    - outlier count,
+    - categorical summary for low-cardinality columns,
+    - heuristic `role_hint` (`"id"`, `"measure"`, `"dimension"`).
+
+- **Diagnostics & identity helpers**
+  - `datasphere_diagnostics` to run high-level MCP & tenant health checks.
+  - `datasphere_get_tenant_info` to inspect redacted configuration (URLs, region hint, TLS, OAuth presence).
+  - `datasphere_get_current_user` to describe the current identity context
+    (technical user vs mock mode) without exposing secrets.
+
+- **Mock mode**
+  - Support for `DATASPHERE_MOCK_MODE=1`, enabling a small in-memory demo
+    dataset for local testing and demos without a real tenant.
+
+- **Packaging metadata**
+  - `pyproject.toml` updated with:
+    - project name `mcp-sap-datasphere-server` (planned PyPI distribution name),
+    - explicit `src/sap_datasphere_mcp` package configuration for Hatch.
+
+### Changed
+
+- `datasphere_profile_column` now returns a richer `numeric_summary` and
+  optional `categorical_summary` and `role_hint`.
+- Internals of `tools/tasks.py` refactored to support both real `DatasphereClient`
+  and `MockDatasphereClient`.
+- Documentation updated to:
+  - distinguish clearly between v0.1.0 and v0.2.0 features,
+  - describe diagnostics, mock mode and metadata tools,
+  - mention the planned PyPI distribution name.
+
+### Fixed
+
+- Improved error handling and more structured `meta` blocks in several tools.
+- Clarified documentation around environment variables and TLS verification.
 
 ---
+
+### 0.1.0 – First public preview
+
+> Initial GitHub release.
+
+### Added
+
+- **Health & connectivity**
+  - `datasphere_ping` to check basic configuration & OAuth.
+
+- **Spaces & catalog**
+  - `datasphere_list_spaces` to list visible Datasphere spaces.
+  - `datasphere_list_assets` to list catalog assets in a given space.
+
+- **Data preview & relational querying**
+  - `datasphere_preview_asset` for small row samples.
+  - `datasphere_query_relational` for simple `$select` / `$filter` /
+    `$orderby` / `$top` / `$skip` queries.
+
+- **Schema & profiling**
+  - `datasphere_describe_asset_schema` for sample-based column summaries.
+  - `datasphere_profile_column` for basic column profiling
+    (counts, distincts, min / max / mean for numeric columns).
+
+- **Search & summaries**
+  - `datasphere_search_assets` for fuzzy search across spaces.
+  - `datasphere_space_summary` for quick space-level overviews.
+
+- **Tooling & demos**
+  - Initial demo scripts (`demo_mcp_*`) for local smoke tests.
+  - Basic documentation and instructions for using the MCP server with
+    Claude Desktop.
+
+## 🔢 Versioning
+
+Current version: **0.3.0**.
+
+- **0.3.0 – analytical + summaries (current)**
+  - Analytical consumption tool: `datasphere_query_analytical`
+  - Deterministic summaries: `datasphere_summarize_asset/space/column_profile`, `datasphere_compare_assets_basic`
+  - TTL cache + configurable caps for safer LLM-driven exploration
+- **0.2.0 – metadata & diagnostics**
+  - Discovery tools: `datasphere_get_asset_metadata`, `datasphere_list_columns`, `datasphere_search_assets`
+  - Mock mode and improved diagnostics tooling
+- **0.1.0 – initial GitHub release**
+  - Basic MCP wiring + relational exploration
+
+A detailed, version-by-version log lives in `CHANGELOG.md` (and is mirrored above in the **Changelog** section).
 
 ## 📄 License
 

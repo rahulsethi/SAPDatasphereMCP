@@ -1,6 +1,6 @@
 # SAP Datasphere MCP Server
 # File: tools/tasks.py
-# Version: v16
+# Version: v18
 #
 # NOTE: This module is the single place where we define "business logic"
 # that is exposed as MCP tools.  The MCP transports (stdio / http) simply
@@ -66,6 +66,51 @@ def _cap_int(value: int, cap: int, min_value: int = 1) -> tuple[int, bool]:
         return cap, True
 
     return v, False
+
+
+def _edm_category(edm_type: Optional[str]) -> Optional[str]:
+    """Coarse type category for OData EDM types."""
+    if not edm_type:
+        return None
+
+    t = str(edm_type).strip().lower()
+    if not t:
+        return None
+
+    if any(
+        token in t
+        for token in (
+            "edm.int",
+            "edm.decimal",
+            "edm.double",
+            "edm.single",
+            "edm.byte",
+            "edm.sbyte",
+        )
+    ):
+        return "numeric"
+    if "edm.boolean" in t:
+        return "boolean"
+    if any(token in t for token in ("edm.date", "edm.datetime", "edm.time")):
+        return "temporal"
+    if "edm.string" in t:
+        return "string"
+    return "other"
+
+
+def _is_id_like(name: str) -> bool:
+    nl = str(name or "").strip().lower()
+    if not nl:
+        return False
+    return (
+        nl == "id"
+        or nl.endswith("_id")
+        or nl.endswith("id")
+        or nl.endswith("_key")
+        or nl.endswith("key")
+        or nl.startswith("id_")
+        or " key" in nl
+    )
 
 
 _CACHE: TTLCache | None = None
@@ -336,6 +381,29 @@ class MockDatasphereClient:
         }
         return _MockQueryResult(columns=used_cols, rows=rows_slice, truncated=truncated, meta=meta)
 
+    async def query_analytical(
+        self,
+        space_id: str,
+        asset_name: str,
+        select: Optional[Iterable[str]] = None,
+        filter_expr: Optional[str] = None,
+        order_by: Optional[str] = None,
+        top: int = 100,
+        skip: int = 0,
+    ) -> _MockQueryResult:
+        # For mock mode, treat analytical like relational.
+        qr = await self.query_relational(
+            space_id=space_id,
+            asset_name=asset_name,
+            select=select,
+            filter_expr=filter_expr,
+            order_by=order_by,
+            top=top,
+            skip=skip,
+        )
+        qr.meta["mode"] = "analytical"
+        return qr
+
     async def get_catalog_asset(self, space_id: str, asset_id: str) -> Dict[str, Any]:
         key = (space_id, asset_id)
         payload = self._catalog_by_key.get(key)
@@ -527,7 +595,8 @@ async def preview_asset(
         order_by=order_by,
     )
 
-    meta = dict(result.meta)
+    # models.QueryResult.meta is Optional[...] now; normalize to a dict.
+    meta = dict((getattr(result, "meta", None) or {}))
     meta.setdefault("requested_top", requested_top)
     meta.setdefault("effective_top", effective_top)
     meta.setdefault("cap_top", cfg.max_rows_preview)
@@ -633,7 +702,7 @@ async def query_relational(
         skip=skip,
     )
 
-    meta = dict(result.meta)
+    meta = dict((getattr(result, "meta", None) or {}))
     meta.setdefault("top", effective_top)
     meta.setdefault("skip", skip)
     meta.setdefault("filter", filter_expr)
@@ -642,6 +711,51 @@ async def query_relational(
     meta.setdefault("requested_top", requested_top)
     meta.setdefault("effective_top", effective_top)
     meta.setdefault("cap_top", cfg.max_rows_query)
+    meta.setdefault("cap_applied", bool(cap_applied))
+
+    return {
+        "columns": result.columns,
+        "rows": result.rows,
+        "truncated": result.truncated,
+        "meta": meta,
+    }
+
+
+async def query_analytical(
+    space_id: str,
+    asset_name: str,
+    select: Optional[Iterable[str]] = None,
+    filter_expr: Optional[str] = None,
+    order_by: Optional[str] = None,
+    top: int = 100,
+    skip: int = 0,
+) -> Dict[str, Any]:
+    """Run an analytical query using the analytical consumption API."""
+    cfg = DatasphereConfig.from_env()
+    requested_top = top
+    effective_top, cap_applied = _cap_int(top, cfg.max_rows_analytical, min_value=1)
+
+    client = _make_client()
+    result = await client.query_analytical(
+        space_id=space_id,
+        asset_name=asset_name,
+        select=select,
+        filter_expr=filter_expr,
+        order_by=order_by,
+        top=effective_top,
+        skip=skip,
+    )
+
+    meta = dict((getattr(result, "meta", None) or {}))
+    meta.setdefault("top", effective_top)
+    meta.setdefault("skip", skip)
+    meta.setdefault("filter", filter_expr)
+    meta.setdefault("order_by", order_by)
+    meta.setdefault("mode", "analytical")
+
+    meta.setdefault("requested_top", requested_top)
+    meta.setdefault("effective_top", effective_top)
+    meta.setdefault("cap_top", cfg.max_rows_analytical)
     meta.setdefault("cap_applied", bool(cap_applied))
 
     return {
@@ -985,9 +1099,7 @@ async def profile_column(
     )
 
     if not qr.columns:
-        raise RuntimeError(
-            f"Preview for asset '{asset_name}' in space '{space_id}' returned no columns."
-        )
+        raise RuntimeError(f"Preview for asset '{asset_name}' in space '{space_id}' returned no columns.")
 
     values = [row[0] for row in qr.rows if row]
 
@@ -1139,6 +1251,243 @@ async def profile_column(
 
 
 # ---------------------------------------------------------------------------
+# v0.3+ Summary helpers (deterministic, tool-friendly)
+# ---------------------------------------------------------------------------
+
+
+async def plugins_status() -> Dict[str, Any]:
+    status = plugin_registry.get_plugin_status()
+    return {
+        "configured": plugin_registry.get_configured_plugins(),
+        "loaded": sum(1 for p in status if p.get("ok")),
+        "failed": sum(1 for p in status if not p.get("ok")),
+        "plugins": status,
+    }
+
+
+async def summarize_asset(space_id: str, asset_name: str, max_columns: int = 200) -> Dict[str, Any]:
+    cfg = DatasphereConfig.from_env()
+    cache = _get_cache(cfg)
+    cache_key = ("summarize_asset", id(_make_client), cfg.tenant_url, cfg.mock_mode, space_id, asset_name, int(max_columns))
+
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    md = await get_asset_metadata(space_id=space_id, asset_name=asset_name)
+    cols = await list_columns(space_id=space_id, asset_name=asset_name, max_columns=max_columns)
+
+    columns: List[Dict[str, Any]] = list(cols.get("columns") or [])
+
+    key_columns = [c.get("name") for c in columns if c.get("is_key")]
+    key_columns = [c for c in key_columns if c]
+
+    edm_types: Dict[str, int] = {}
+    type_categories: Dict[str, int] = {}
+    id_like: List[str] = []
+    numeric_like: List[str] = []
+    temporal_like: List[str] = []
+    boolean_like: List[str] = []
+    string_like: List[str] = []
+    other_like: List[str] = []
+
+    for c in columns:
+        name = c.get("name")
+        if not name:
+            continue
+        if _is_id_like(str(name)):
+            id_like.append(str(name))
+
+        t = c.get("type")
+        if t:
+            edm_types[str(t)] = edm_types.get(str(t), 0) + 1
+
+        cat = _edm_category(t)
+        if cat:
+            type_categories[cat] = type_categories.get(cat, 0) + 1
+            if cat == "numeric":
+                numeric_like.append(str(name))
+            elif cat == "temporal":
+                temporal_like.append(str(name))
+            elif cat == "boolean":
+                boolean_like.append(str(name))
+            elif cat == "string":
+                string_like.append(str(name))
+            else:
+                other_like.append(str(name))
+
+    suggested_measures = [c for c in numeric_like if c not in id_like]
+    suggested_dimensions = [c for c in (string_like + temporal_like + boolean_like) if c not in suggested_measures]
+
+    summary = {
+        "asset_id": md.get("asset_id"),
+        "name": md.get("name"),
+        "label": md.get("label"),
+        "description": md.get("description"),
+        "type": md.get("type"),
+        "supports": {
+            "relational": bool(md.get("supports_relational_queries")),
+            "analytical": bool(md.get("supports_analytical_queries")),
+        },
+        "column_count": int(cols.get("meta", {}).get("column_count") or len(columns)),
+        "keys": key_columns or None,
+        "id_like_columns": id_like[:50] or None,
+        "type_categories": type_categories or None,
+        "top_edm_types": sorted(edm_types.items(), key=lambda kv: (-kv[1], kv[0]))[:10] or None,
+        "suggested_dimensions": suggested_dimensions[:50] or None,
+        "suggested_measures": suggested_measures[:50] or None,
+        "urls": md.get("urls"),
+    }
+
+    out = {
+        "space_id": space_id,
+        "asset_name": asset_name,
+        "summary": summary,
+        "columns": columns,
+        "meta": {
+            "max_columns": int(max_columns),
+            "columns_source": cols.get("meta", {}).get("source"),
+            "cache_ttl_seconds": cfg.cache_ttl_seconds,
+        },
+    }
+
+    cache.set(cache_key, out)
+    return out
+
+
+async def summarize_space(space_id: str, max_assets: int = 50) -> Dict[str, Any]:
+    cfg = DatasphereConfig.from_env()
+    cache = _get_cache(cfg)
+    cache_key = ("summarize_space", id(_make_client), cfg.tenant_url, cfg.mock_mode, space_id, int(max_assets))
+
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    base = await space_summary(space_id=space_id, max_assets=max_assets)
+    type_counts = base.get("asset_types") or {}
+    top_types = sorted(type_counts.items(), key=lambda kv: (-kv[1], kv[0]))[:10]
+
+    out = {
+        "space_id": space_id,
+        "summary": {
+            "total_assets": base.get("total_assets"),
+            "top_types": top_types or None,
+        },
+        "sample_assets": base.get("sample_assets"),
+        "meta": {"max_assets": int(max_assets), "cache_ttl_seconds": cfg.cache_ttl_seconds},
+    }
+    cache.set(cache_key, out)
+    return out
+
+
+async def summarize_column_profile(
+    space_id: str,
+    asset_name: str,
+    column_name: str,
+    top: int = 100,
+) -> Dict[str, Any]:
+    prof = await profile_column(space_id=space_id, asset_name=asset_name, column_name=column_name, top=top)
+
+    total = int(prof.get("total_count") or 0)
+    null_count = int(prof.get("null_count") or 0)
+    null_fraction = (null_count / total) if total > 0 else None
+
+    numeric = prof.get("numeric_summary") or None
+    categorical = prof.get("categorical_summary") or None
+
+    highlights: Dict[str, Any] = {
+        "role_hint": prof.get("role_hint"),
+        "types": prof.get("types"),
+        "total_count": total,
+        "null_fraction": null_fraction,
+        "distinct_sampled": prof.get("distinct_sampled"),
+        "example_values": prof.get("example_values"),
+    }
+
+    if numeric:
+        highlights["numeric"] = {
+            "min": numeric.get("min"),
+            "max": numeric.get("max"),
+            "mean": numeric.get("mean"),
+            "p50": numeric.get("p50"),
+            "p25": numeric.get("p25"),
+            "p75": numeric.get("p75"),
+            "outlier_count": numeric.get("outlier_count"),
+        }
+
+    if categorical:
+        highlights["categorical"] = {
+            "unique_values": categorical.get("unique_values"),
+            "concentration": categorical.get("concentration"),
+            "top_values": categorical.get("top_values"),
+        }
+
+    return {
+        "space_id": space_id,
+        "asset_name": asset_name,
+        "column_name": column_name,
+        "highlights": highlights,
+        "meta": prof.get("meta"),
+        "raw": prof,
+    }
+
+
+async def compare_assets_basic(
+    left_space_id: str,
+    left_asset_name: str,
+    right_space_id: str,
+    right_asset_name: str,
+    max_columns: int = 200,
+) -> Dict[str, Any]:
+    left = await list_columns(space_id=left_space_id, asset_name=left_asset_name, max_columns=max_columns)
+    right = await list_columns(space_id=right_space_id, asset_name=right_asset_name, max_columns=max_columns)
+
+    left_cols = [c.get("name") for c in (left.get("columns") or []) if c.get("name")]
+    right_cols = [c.get("name") for c in (right.get("columns") or []) if c.get("name")]
+
+    left_map = {str(n).lower(): str(n) for n in left_cols}
+    right_map = {str(n).lower(): str(n) for n in right_cols}
+
+    left_set = set(left_map.keys())
+    right_set = set(right_map.keys())
+
+    common = sorted(left_set.intersection(right_set))
+    only_left = sorted(left_set.difference(right_set))
+    only_right = sorted(right_set.difference(left_set))
+
+    union = left_set.union(right_set)
+    jaccard = (len(common) / len(union)) if union else None
+
+    left_keys = set(
+        str(c.get("name")).lower()
+        for c in (left.get("columns") or [])
+        if c.get("is_key") and c.get("name")
+    )
+    right_keys = set(
+        str(c.get("name")).lower()
+        for c in (right.get("columns") or [])
+        if c.get("is_key") and c.get("name")
+    )
+
+    join_candidates: List[str] = []
+    for c in common:
+        if c in left_keys or c in right_keys or _is_id_like(c):
+            join_candidates.append(left_map.get(c) or right_map.get(c) or c)
+
+    return {
+        "left": {"space_id": left_space_id, "asset_name": left_asset_name, "column_count": len(left_cols)},
+        "right": {"space_id": right_space_id, "asset_name": right_asset_name, "column_count": len(right_cols)},
+        "similarity": {"jaccard": jaccard, "common_count": len(common)},
+        "common_columns": [left_map.get(c) or right_map.get(c) or c for c in common],
+        "only_in_left": [left_map.get(c) or c for c in only_left],
+        "only_in_right": [right_map.get(c) or c for c in only_right],
+        "join_candidates": join_candidates or None,
+        "meta": {"max_columns": int(max_columns)},
+    }
+
+
+# ---------------------------------------------------------------------------
 # Diagnostics & identity helpers
 # ---------------------------------------------------------------------------
 
@@ -1185,6 +1534,7 @@ def _collect_tenant_info() -> Dict[str, Any]:
             "max_rows_preview": cfg.max_rows_preview,
             "max_rows_query": cfg.max_rows_query,
             "max_rows_profile": cfg.max_rows_profile,
+            "max_rows_analytical": cfg.max_rows_analytical,
             "max_search_results": cfg.max_search_results,
         },
         "cache_config": {
@@ -1237,9 +1587,7 @@ async def diagnostics() -> Dict[str, Any]:
     t0 = time.time()
     try:
         client = _make_client()
-        checks.append(
-            {"name": "client_init", "ok": True, "error": None, "elapsed_ms": int((time.time() - t0) * 1000)}
-        )
+        checks.append({"name": "client_init", "ok": True, "error": None, "elapsed_ms": int((time.time() - t0) * 1000)})
     except Exception as exc:  # pragma: no cover
         overall_ok = False
         checks.append(
@@ -1413,6 +1761,29 @@ def register_tools(server: Any) -> None:
         )
 
     @server.tool(
+        name="datasphere_query_analytical",
+        description="Run an analytical query (select / filter / order / paging) against an analytical Datasphere asset.",
+    )
+    async def mcp_query_analytical(
+        space_id: str,
+        asset_name: str,
+        select: Optional[Iterable[str]] = None,
+        filter_expr: Optional[str] = None,
+        order_by: Optional[str] = None,
+        top: int = 100,
+        skip: int = 0,
+    ) -> Dict[str, Any]:
+        return await query_analytical(
+            space_id=space_id,
+            asset_name=asset_name,
+            select=select,
+            filter_expr=filter_expr,
+            order_by=order_by,
+            top=top,
+            skip=skip,
+        )
+
+    @server.tool(
         name="datasphere_get_asset_metadata",
         description="Get catalog metadata for a Datasphere asset, including labels, type and exposure via APIs.",
     )
@@ -1481,6 +1852,62 @@ def register_tools(server: Any) -> None:
         top: int = 100,
     ) -> Dict[str, Any]:
         return await profile_column(space_id=space_id, asset_name=asset_name, column_name=column_name, top=top)
+
+    # ---- v0.3+ deterministic summary tools ----
+
+    @server.tool(
+        name="datasphere_summarize_asset",
+        description="Deterministic summary of an asset: metadata + column overview (keys, measures/dimensions hints).",
+    )
+    async def mcp_summarize_asset(space_id: str, asset_name: str, max_columns: int = 200) -> Dict[str, Any]:
+        return await summarize_asset(space_id=space_id, asset_name=asset_name, max_columns=max_columns)
+
+    @server.tool(
+        name="datasphere_summarize_space",
+        description="Deterministic summary of a space: total assets, top types, and a sample asset list.",
+    )
+    async def mcp_summarize_space(space_id: str, max_assets: int = 50) -> Dict[str, Any]:
+        return await summarize_space(space_id=space_id, max_assets=max_assets)
+
+    @server.tool(
+        name="datasphere_summarize_column_profile",
+        description="Deterministic summary of a column profile (role hint, null fraction, numeric/categorical highlights).",
+    )
+    async def mcp_summarize_column_profile(
+        space_id: str,
+        asset_name: str,
+        column_name: str,
+        top: int = 100,
+    ) -> Dict[str, Any]:
+        return await summarize_column_profile(space_id=space_id, asset_name=asset_name, column_name=column_name, top=top)
+
+    @server.tool(
+        name="datasphere_compare_assets_basic",
+        description="Compare two assets by column names (common, differences, similarity, join-key hints).",
+    )
+    async def mcp_compare_assets_basic(
+        left_space_id: str,
+        left_asset_name: str,
+        right_space_id: str,
+        right_asset_name: str,
+        max_columns: int = 200,
+    ) -> Dict[str, Any]:
+        return await compare_assets_basic(
+            left_space_id=left_space_id,
+            left_asset_name=left_asset_name,
+            right_space_id=right_space_id,
+            right_asset_name=right_asset_name,
+            max_columns=max_columns,
+        )
+
+    @server.tool(
+        name="datasphere_plugins_status",
+        description="Show configured plugins and the last plugin load status (loaded/failed + errors).",
+    )
+    async def mcp_plugins_status() -> Dict[str, Any]:
+        return await plugins_status()
+
+    # ---- diagnostics ----
 
     @server.tool(
         name="datasphere_diagnostics",

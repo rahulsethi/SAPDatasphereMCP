@@ -1,6 +1,6 @@
 # SAP Datasphere MCP Server
 # File: __init__.py
-# Version: v2
+# Version: v3
 
 """Top-level package for the SAP Datasphere MCP Server."""
 
@@ -23,7 +23,7 @@ def _resolve_version() -> str:
     except PackageNotFoundError:
         # Running from source tree without installed package metadata.
         # This fallback avoids import-time failure.
-        return "0.2.0"
+        return "0.3.0"
 
 
 __version__ = _resolve_version()

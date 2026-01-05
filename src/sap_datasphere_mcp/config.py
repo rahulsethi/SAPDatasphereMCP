@@ -1,6 +1,6 @@
 # SAP Datasphere MCP Server
 # File: config.py
-# Version: v2
+# Version: v4
 
 """Configuration loading for the SAP Datasphere MCP Server."""
 
@@ -53,6 +53,7 @@ class DatasphereConfig:
     - TLS verification toggle
     - hard caps for row-returning tools
     - metadata TTL cache settings
+    - analytical row cap
     """
 
     tenant_url: str | None
@@ -66,6 +67,7 @@ class DatasphereConfig:
     max_rows_preview: int = 200
     max_rows_query: int = 500
     max_rows_profile: int = 500
+    max_rows_analytical: int = 500
     max_search_results: int = 200
 
     # v0.3+ caching (metadata-focused)
@@ -74,11 +76,17 @@ class DatasphereConfig:
 
     @classmethod
     def from_env(cls) -> "DatasphereConfig":
-        """Create configuration from environment variables."""
+        """Create configuration from environment variables.
+
+        Backward-compatible aliases:
+        - DATASPHERE_OAUTH_CLIENT_ID / DATASPHERE_OAUTH_CLIENT_SECRET
+          (older naming)
+        """
         tenant_url = os.getenv("DATASPHERE_TENANT_URL")
         oauth_token_url = os.getenv("DATASPHERE_OAUTH_TOKEN_URL")
-        client_id = os.getenv("DATASPHERE_CLIENT_ID")
-        client_secret = os.getenv("DATASPHERE_CLIENT_SECRET")
+
+        client_id = os.getenv("DATASPHERE_CLIENT_ID") or os.getenv("DATASPHERE_OAUTH_CLIENT_ID")
+        client_secret = os.getenv("DATASPHERE_CLIENT_SECRET") or os.getenv("DATASPHERE_OAUTH_CLIENT_SECRET")
 
         mock_mode = _parse_bool_env("DATASPHERE_MOCK_MODE", default=False)
         verify_tls = _parse_bool_env("DATASPHERE_VERIFY_TLS", default=True)
@@ -92,6 +100,9 @@ class DatasphereConfig:
         )
         max_rows_profile = _parse_int_env(
             "DATASPHERE_MAX_ROWS_PROFILE", default=500, min_value=1, max_value=10000
+        )
+        max_rows_analytical = _parse_int_env(
+            "DATASPHERE_MAX_ROWS_ANALYTICAL", default=500, min_value=1, max_value=100000
         )
         max_search_results = _parse_int_env(
             "DATASPHERE_MAX_SEARCH_RESULTS", default=200, min_value=1, max_value=10000
@@ -115,6 +126,7 @@ class DatasphereConfig:
             max_rows_preview=max_rows_preview,
             max_rows_query=max_rows_query,
             max_rows_profile=max_rows_profile,
+            max_rows_analytical=max_rows_analytical,
             max_search_results=max_search_results,
             cache_ttl_seconds=cache_ttl_seconds,
             cache_max_entries=cache_max_entries,
