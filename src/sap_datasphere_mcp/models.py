@@ -1,12 +1,17 @@
 # SAP Datasphere MCP Server
 # File: models.py
-# Version: v2
+# Version: v3
 
-"""Domain models used by the SAP Datasphere MCP server."""
+"""Domain models used by the SAP Datasphere MCP server.
+
+Alignment notes (v0.3+):
+- QueryResult.meta is treated as a dict throughout the codebase (tasks/client).
+  To avoid None-related surprises, we normalize meta to {} in __post_init__.
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 
@@ -46,5 +51,10 @@ class QueryResult:
     # True if the result was truncated (e.g. due to row limits).
     truncated: bool = False
 
-    # Extra metadata – timings, row counts, etc.
-    meta: Optional[Dict[str, Any]] = None
+    # Extra metadata – timings, row counts, mode (relational/analytical), etc.
+    meta: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # Defensive normalization: allow older callers that passed meta=None.
+        if self.meta is None:  # type: ignore[truthy-bool]
+            self.meta = {}
