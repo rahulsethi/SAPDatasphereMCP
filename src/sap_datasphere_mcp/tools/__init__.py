@@ -1,19 +1,10 @@
 # SAP Datasphere MCP Server
 # File: tools/__init__.py
-# Version: v1
+# Version: v2
 
-"""Helpers for registering MCP tools."""
+"""MCP tool registrations.
 
-from __future__ import annotations
-
-from mcp.server.fastmcp import FastMCP  # type: ignore[import]
-
-from ..client import DatasphereClient
-from . import spaces, catalog, data
-
-
-def register_all_tools(mcp: FastMCP, client: DatasphereClient) -> None:
-    """Register all MCP tools exposed by this server."""
-    spaces.register_tools(mcp, client)
-    catalog.register_tools(mcp, client)
-    data.register_tools(mcp, client)
+The full tool surface lives in :mod:`sap_datasphere_mcp.tools.tasks` and is
+registered via :func:`tasks.register_tools`. This package marker exists so the
+``tools`` directory remains importable.
+"""

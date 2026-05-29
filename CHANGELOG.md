@@ -1,16 +1,79 @@
 <!-- SAP Datasphere MCP Server -->
 <!-- File: CHANGELOG.md -->
-<!-- Version: v2 -->
+<!-- Version: v3 -->
 
 # Changelog
 
-All notable changes to this project are documented here.
+All notable changes to this project are documented here. This file at the
+repository root is the canonical changelog.
+
+---
+
+## 0.3.1 – Cleanup & reorganization
+
+> Patch release. No behavior changes, no public API changes.
+
+### Changed
+
+- **Repository layout** — `demo_*.py` and ad-hoc `test_*.py` scripts moved from
+  the repo root into a new `examples/` directory. The four `smoke_*.py` scripts
+  are renamed (from `test_*.py`) so pytest no longer collects them. The
+  automated test suite remains in `tests/`.
+- **`docs/` is now tracked** — the previous `.gitignore` accidentally excluded
+  the whole documentation folder. Architecture notes, the backlog, version
+  plans, and the historical changelog mirror are now part of the repo.
+- **`set-datasphere-env.example.ps1`** added as a sanitized template. The local
+  `set-datasphere-env.ps1` continues to be gitignored.
+
+### Removed
+
+- **Dead `tools/` submodules** — `tools/catalog.py`, `tools/spaces.py`,
+  `tools/connections.py`, `tools/data.py`, and the unused
+  `tools/__init__.py:register_all_tools()` helper. The active boot path goes
+  directly through `tools/tasks.register_tools()`; nothing imported the deleted
+  modules.
+- **`src/sap_datasphere_mcp/test_list_assets.py`** — stray smoke script that
+  lived inside the installable package. Moved to `examples/smoke_list_assets.py`.
+- **`demo_claude_desktop/SAPDatasphere_MCP_rahulsethi.mp4`** (18 MB) — removed
+  from the working tree to reduce clone size for new contributors. The blob
+  remains in git history; the video itself can be linked from a GitHub Release.
+- **Stale `dist/` 0.3.0 build artifacts** and root `__pycache__/`.
+
+### Fixed
+
+- **`.gitignore`** — removed the line that excluded `docs/` from the repo,
+  added `.claude/settings.local.json`, added a case-insensitive `[Nn]ew folder/`
+  pattern, and added `.ruff_cache/` alongside the existing `ruff_cache/`.
+
+---
+
+## 0.3.0 – Analytical querying, summaries & guardrails
+
+### Added
+
+- Configurable guardrails for row-returning tools and search results (caps enforced in tool layer).
+- Metadata-focused TTL cache to reduce repeated backend calls for discovery/metadata tools.
+- Analytical querying tool: `datasphere_query_analytical`.
+- Deterministic summary tools:
+  - `datasphere_summarize_asset`
+  - `datasphere_summarize_space`
+  - `datasphere_summarize_column_profile`
+- Asset comparison helper: `datasphere_compare_assets_basic`.
+- Plugin observability tool: `datasphere_plugins_status` (also surfaced in diagnostics output).
+
+### Changed
+
+- Tool responses now include clearer `meta` fields (requested vs effective limits, cap applied flags) to make truncation explicit.
+- OAuth client hardened (client-credentials via HTTP Basic auth + token caching + clearer errors).
+- Config expanded for TLS verification toggle, caps, and cache settings.
+
+### Fixed
+
+- Normalized handling for optional query metadata to avoid `None`-shaped surprises in tool responses.
 
 ---
 
 ## 0.2.0 – Metadata & Diagnostics expansion
-
-> Status: in development / preview.
 
 ### Added
 

@@ -17,9 +17,6 @@ set-datasphere-env.ps1
 .env
 .env.*
 
-# Local docs (not yet public)
-docs/
-
 # Build artifacts
 dist/
 build/
@@ -29,3 +26,10 @@ build/
 .pytest_cache/
 .mypy_cache/
 ruff_cache/
+.ruff_cache/
+
+# Windows Explorer artifacts
+[Nn]ew folder/
+
+# Claude Code local settings (per-developer)
+.claude/settings.local.json

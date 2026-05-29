@@ -13,7 +13,7 @@ The server exposes a small, focused set of **read-only** tools to:
 - Profile columns with LLM-friendly summaries
 - Inspect metadata & diagnostics to understand “what is this thing?”
 
-**Current status: `v0.3.0` – analytical querying + deterministic summaries, caching, and safer defaults (still preview).**  
+**Current status: `v0.3.1` – cleanup & reorganization on top of v0.3.0 (analytical querying + deterministic summaries, caching, and safer defaults). Still preview.**  
 APIs may still change in future versions.
 
 ---
@@ -271,22 +271,28 @@ Optional:
 
 ### Example (PowerShell helper script, Windows)
 
-Create `set-datasphere-env.ps1` in the project root:
+Copy the template that ships with the repo and fill in real values:
 
 ```powershell
-$env:DATASPHERE_TENANT_URL          = "https://your-tenant-id.eu10.hcs.cloud.sap"
-$env:DATASPHERE_OAUTH_TOKEN_URL     = "https://your-uaa-domain/oauth/token"
-$env:DATASPHERE_CLIENT_ID           = "your-client-id"
-$env:DATASPHERE_CLIENT_SECRET       = "your-client-secret"
+Copy-Item set-datasphere-env.example.ps1 set-datasphere-env.ps1
+# Edit set-datasphere-env.ps1 and replace the <your-*> placeholders.
+```
+
+The local `set-datasphere-env.ps1` is gitignored, so your secrets never leave
+your machine. The template looks like this:
+
+```powershell
+$env:DATASPHERE_TENANT_URL      = 'https://<your-tenant>.<region>.hcs.cloud.sap'
+$env:DATASPHERE_OAUTH_TOKEN_URL = 'https://<your-uaa-domain>/oauth/token'
+$env:DATASPHERE_CLIENT_ID       = '<your-client-id>'
+$env:DATASPHERE_CLIENT_SECRET   = '<your-client-secret>'
 
 # Optional: skip TLS verification for self-signed corporate proxies
 # (only if you understand the security implications)
-# $env:DATASPHERE_VERIFY_TLS = "0"
+# $env:DATASPHERE_VERIFY_TLS = '0'
 
 # Optional: run in mock mode without a real tenant (v0.2.0)
-# $env:DATASPHERE_MOCK_MODE = "1"
-
-Write-Host "Datasphere environment variables set."
+# $env:DATASPHERE_MOCK_MODE = '1'
 ```
 
 Then in each new shell:
@@ -307,36 +313,37 @@ With env vars set and your virtualenv active:
 pytest
 ```
 
-Then try the demo scripts:
+Then try the demo scripts in [`examples/`](examples/) (see [`examples/README.md`](examples/README.md) for the full catalogue):
 
 ```bash
 # List spaces via MCP tasks
-python demo_mcp_list_spaces.py
+python examples/demo_mcp_list_spaces.py
 
 # List assets in a specific space (set DATASPHERE_TEST_SPACE first)
-python demo_mcp_list_assets.py
+python examples/demo_mcp_list_assets.py
 
 # Preview data (with optional filter)
-python demo_mcp_preview_filtered.py
+python examples/demo_mcp_preview_filtered.py
 
 # Describe schema from a sample
-python demo_mcp_describe_asset.py
+python examples/demo_mcp_describe_asset.py
 
 # Query with filter/sort/select/skip
-python demo_mcp_query_relational.py
+python examples/demo_mcp_query_relational.py
 
 # Search assets by name / id
-python demo_mcp_search_assets.py
+python examples/demo_mcp_search_assets.py
 
 # Summarise a space
-python demo_mcp_space_summary.py
+python examples/demo_mcp_space_summary.py
 
 # Profile one column
-python demo_mcp_profile_column.py
+python examples/demo_mcp_profile_column.py
 ```
 
 Each script prints JSON-like results so you can see exactly what MCP tools
-return to an AI agent.
+return to an AI agent. The `examples/smoke_*.py` scripts hit your real tenant
+for quick sanity checks; they are not part of the pytest suite.
 
 ---
 
@@ -497,7 +504,21 @@ are easy for LLMs (and humans) to reason about.
 
 ## 📜 Changelog
 
-All notable changes to this project are documented here.
+The canonical changelog lives at [`CHANGELOG.md`](CHANGELOG.md). A summary of
+the most recent releases is mirrored below.
+
+
+### [0.3.1] – Cleanup & reorganization
+
+- Moved root-level `demo_*.py` and ad-hoc `test_*.py` scripts to `examples/`
+  (`test_*.py` renamed to `smoke_*.py` so pytest no longer collects them).
+- Deleted unreachable `tools/{catalog,spaces,connections,data}.py` and the
+  unused `register_all_tools()` helper.
+- Made `docs/` tracked in the repo (previously gitignored).
+- Removed the 18 MB demo MP4 from the working tree to shrink clones.
+- Added `set-datasphere-env.example.ps1`; the real `set-datasphere-env.ps1`
+  stays gitignored.
+- No public API or behavior changes.
 
 
 ### [0.3.0]
@@ -619,9 +640,14 @@ All notable changes to this project are documented here.
 
 ## 🔢 Versioning
 
-Current version: **0.3.0**.
+Current version: **0.3.1**.
 
-- **0.3.0 – analytical + summaries (current)**
+- **0.3.1 – cleanup & reorganization (current)**
+  - Demos and smoke scripts moved to `examples/`; pytest suite untouched in `tests/`
+  - Deleted unreachable `tools/` submodules (boot path was bypassing them)
+  - `docs/` now tracked in the repo; canonical changelog at root `CHANGELOG.md`
+  - No behavior changes
+- **0.3.0 – analytical + summaries**
   - Analytical consumption tool: `datasphere_query_analytical`
   - Deterministic summaries: `datasphere_summarize_asset/space/column_profile`, `datasphere_compare_assets_basic`
   - TTL cache + configurable caps for safer LLM-driven exploration
