@@ -33,3 +33,7 @@ ruff_cache/
 
 # Claude Code local settings (per-developer)
 .claude/settings.local.json
+
+
+.claude
+CLAUDE.md
