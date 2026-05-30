@@ -1,0 +1,17 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include COMMERCIAL_LICENSING.md
+include pyproject.toml
+include .env.example
+include set-datasphere-env.example.ps1
+recursive-include src/sap_datasphere_mcp *.py *.json
+recursive-include src/sap_datasphere_mcp/schemas *.json
+graft public_docs
+prune docs
+prune tests
+prune examples
+prune .github
+prune npx-wrapper
+global-exclude __pycache__
+global-exclude *.py[cod]

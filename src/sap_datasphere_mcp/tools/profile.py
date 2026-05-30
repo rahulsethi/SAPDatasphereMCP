@@ -1,0 +1,19 @@
+# SAP Datasphere MCP Server
+# File: tools/profile.py
+# Version: v1 (1.0)
+
+"""Profile tier tools (facade)."""
+
+from __future__ import annotations
+
+from typing import Any, Awaitable, Callable, List, Tuple
+
+from . import tasks
+from ._metadata import TOOL_REGISTRY, ToolMetadata
+
+__all__ = ["BINDINGS"]
+
+BINDINGS: List[Tuple[ToolMetadata, Callable[..., Awaitable[Any]]]] = [
+    (TOOL_REGISTRY["datasphere_profile_schema"], tasks.describe_asset_schema),
+    (TOOL_REGISTRY["datasphere_profile_column"], tasks.profile_column),
+]

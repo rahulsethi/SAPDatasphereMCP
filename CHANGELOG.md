@@ -1,11 +1,88 @@
 <!-- SAP Datasphere MCP Server -->
 <!-- File: CHANGELOG.md -->
-<!-- Version: v3 -->
+<!-- Version: v4 -->
 
 # Changelog
 
 All notable changes to this project are documented here. This file at the
 repository root is the canonical changelog.
+
+---
+
+## 1.0.0 – Family-aligned graduation release
+
+> Released 2026-07-13. The first 1.x release of `SAPDatasphereMCP`.
+> Renames, governance, and the MCP whitespace plays Mario hadn't taken — bundled into one coherent breaking change so users absorb the cost once.
+
+### Added
+
+- **24 MCP tools** in 7 categories (`connectivity`, `catalog`, `query`, `discover`, `profile`, `summarize`, `governance`). 22 ported from v0.3.x; 2 new governance tools: `datasphere_governance_api_policy_check` and `datasphere_governance_audit_tail`.
+- **MCP Prompts (5)** — `profile_dataset`, `audit_space`, `explain_analytical_model`, `compare_assets`, `find_data_about_topic`. First SAP MCP server to ship prompts.
+- **MCP Resources (4)** — URI-addressable catalog content under `datasphere://space/{id}` and three nested forms. First SAP MCP server to ship resources.
+- **MCP tool annotations** (`readOnlyHint`/`idempotentHint`/`destructiveHint`) on every tool. Every tool is `readOnly`; none are `destructive`.
+- **Governance layer ported from sibling SAPBDCMCP**: `audit.py` (JSONL audit log), `policy.py` + `policy_evidence.py` (SAP API Policy v4/2026 gate + disclosure), `redaction.py` (secret/PII scrubbing), `tools/_metadata.py` (per-tool risk metadata), `tools/_gated.py` (interceptor chain).
+- **Optional mTLS-bound OAuth client_credentials** via IAS — set `DATASPHERE_OAUTH_MTLS_CERT` + `DATASPHERE_OAUTH_MTLS_KEY`.
+- **HTTP transport bearer auth** — set `DATASPHERE_MCP_BEARER_TOKEN`.
+- **`server.create_server()` factory** shared by both transports; `python -m sap_datasphere_mcp` works.
+- **npx distribution** — `npx-wrapper/` ships `@rahulsethi/sap-datasphere-mcp`, a Node bootstrap that probes uvx → pipx → python3 and forwards stdio.
+- **CI workflow** — `.github/workflows/ci.yml` runs pytest on Linux/macOS/Windows × Python 3.11/3.12/3.13, plus ruff and a build step.
+- **`CONTRIBUTING.md`, `MANIFEST.in`, `.editorconfig`, `.env.example`** ported from sibling.
+- **`public_docs/`** — user-facing docs: `README`, `INSTALLATION`, `QUICKSTART`, `TOOLS`, `MIGRATION`, `SAP_API_POLICY`, `COMMERCIAL_LICENSING`.
+- **`docs/v1.0/`** — full design set: `ProjectPlan_v1.0.md`, `Architecture_v1.0.md`, `Decisions_v1.0.md` (12 ADRs), `ImplementationTracker_v1.0.md`.
+- **13 new pytest tests** covering registry, governance, prompts/resources wiring, redaction, policy gate, alias deprecation. Total suite: 34 tests, all green.
+
+### Changed
+
+- **All 22 v0.3.x tool names** renamed to `datasphere_<category>_<verb>`. Old names remain registered as deprecation aliases through v1.1; aliases emit a one-time-per-process structured-log warning. See `public_docs/MIGRATION.md` for the full mapping table.
+- **PyPI distribution renamed** `mcp-sap-datasphere-server` → `sap-datasphere-mcp`. The console script name (`sap-datasphere-mcp`) and Python import path (`sap_datasphere_mcp`) are unchanged.
+- **Default API path order** flipped: clients try `/api/v1/datasphere/...` first, falling back to `/api/v1/dwc/...` only on 404/405. Set `DATASPHERE_API_PATH_LEGACY=1` to revert.
+- **Python floor bumped** 3.10 → 3.11.
+- **`mcp` SDK pin bumped** `>=1.2.0` → `mcp[cli]>=1.25.0`. Added `python-dotenv>=1.0.1` and `jsonschema>=4.20.0` as deps.
+- **`tools/` reorganized** into per-category facade modules + a single `registry.py`. Async implementations remain in `tools/tasks.py` (ADR-011 defers deeper code split to a future release).
+- **README rewrite** with family section pointing at SAPBDCMCP, MCP Gateway recommendation, and a per-tool risk table.
+- **CHANGELOG taxonomy expanded** to mirror sibling: Added / Changed / Deprecated / Removed / Fixed / Licensing / Deferred / Migration.
+
+### Deprecated
+
+- All 22 v0.3.x tool names (e.g. `datasphere_ping`, `datasphere_list_spaces`). Removed in v1.2.
+- Legacy `/api/v1/dwc/*` API path tree. Supported by SAP through March 2027.
+- `tasks.register_tools(server)` direct call — superseded by `tools.registry.register_all(server)` (called by `server.create_server()` automatically).
+
+### Removed
+
+- The `mcp-sap-datasphere-server` PyPI name (replaced by `sap-datasphere-mcp`).
+- Python 3.10 support.
+
+### Fixed
+
+- Audit failures no longer break tool calls — the audit writer swallows `OSError` so disk problems don't propagate.
+- Redaction is conservative by default — patterns restricted to fields whose key names look like secrets, plus universal JWT/Bearer scrubbing. Avoids false positives in legitimate enterprise data.
+
+### Licensing
+
+- **Relicensed from MIT to PolyForm Noncommercial 1.0.0** (v1.0+). Versions v0.3.1 and earlier remain MIT-licensed and are unaffected. Personal, research, academic, and internal evaluation use is free; commercial use requires a separate commercial license — see [`COMMERCIAL_LICENSING.md`](COMMERCIAL_LICENSING.md) for the friendly path. Same license arrangement as sibling [SAPBDCMCP](https://github.com/rahulsethi/SAPBDCMCP); 2-for-1 family discount available on request.
+
+### Deferred (will land in 1.0.x / 1.1)
+
+- Per-tool `outputSchema` JSON Schemas under `src/.../schemas/`.
+- Opaque cursor-based pagination for list/discover tools.
+- `npx:`/`uvx:`/`cmd:` subprocess plugin upstreams in `plugins/registry.py`.
+- Data Product tools (the SAP-endorsed BDC agent surface).
+- SAP Knowledge Graph integration; lineage / data quality first-class tools.
+- Anthropic MCP registry application.
+
+### Migration
+
+If you're upgrading from v0.3.x, see [`public_docs/MIGRATION.md`](public_docs/MIGRATION.md). Short version:
+
+```bash
+pip uninstall mcp-sap-datasphere-server
+pip install sap-datasphere-mcp
+# or: uvx sap-datasphere-mcp
+# or: npx -y @rahulsethi/sap-datasphere-mcp
+```
+
+Old tool names continue to work through v1.1 with deprecation logs. Update your Claude Desktop / Cursor configs before v1.2.
 
 ---
 

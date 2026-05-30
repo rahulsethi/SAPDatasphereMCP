@@ -1,24 +1,39 @@
 # SAP Datasphere MCP Server
 # File: pyproject.toml
-# Version: v2
+# Version: v3 (1.0)
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "mcp-sap-datasphere-server"
-version = "0.3.1"
-description = "MCP server exposing SAP Datasphere tools and resources"
+name = "sap-datasphere-mcp"
+version = "1.0.0"
+description = "Read-only SAP Datasphere MCP server — API Policy v4/2026 aligned, sibling to SAPBDCMCP."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [{ name = "Rahul Sethi" }]
 license = { file = "LICENSE" }
+keywords = ["sap", "datasphere", "mcp", "model-context-protocol", "ai", "anthropic", "claude", "bdc"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Information Technology",
+  "License :: Free for non-commercial use",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Database",
+  "Topic :: Software Development :: Libraries",
+]
 
 dependencies = [
-  "mcp>=1.2.0",
+  "mcp[cli]>=1.25.0",
   "httpx>=0.27.0",
   "pydantic>=2.7.0",
+  "python-dotenv>=1.0.1",
+  "jsonschema>=4.20.0",
 ]
 
 [project.optional-dependencies]
@@ -26,11 +41,22 @@ dev = [
   "pytest>=8.3.0",
   "pytest-asyncio>=0.23.0",
   "ruff>=0.5.0",
+  "build>=1.2.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/rahulsethi/SAPDatasphereMCP"
+Repository = "https://github.com/rahulsethi/SAPDatasphereMCP"
+Issues = "https://github.com/rahulsethi/SAPDatasphereMCP/issues"
+Family = "https://github.com/rahulsethi/SAPBDCMCP"
+"Changelog" = "https://github.com/rahulsethi/SAPDatasphereMCP/blob/main/CHANGELOG.md"
 
 [project.scripts]
 sap-datasphere-mcp = "sap_datasphere_mcp.transports.stdio_server:main"
 
 [tool.hatch.build.targets.wheel]
-# Explicitly tell Hatch which package directory to include in the wheel
 packages = ["src/sap_datasphere_mcp"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

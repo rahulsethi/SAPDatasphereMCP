@@ -1,0 +1,38 @@
+{
+  "name": "@rahulsethi/sap-datasphere-mcp",
+  "version": "1.0.0",
+  "description": "Node wrapper that bootstraps the SAP Datasphere MCP Server (Python) via uvx. Read-only. API Policy v4/2026 aligned. Sibling to @rahulsethi/sap-bdc-mcp.",
+  "keywords": [
+    "sap",
+    "datasphere",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "anthropic",
+    "claude"
+  ],
+  "license": "SEE LICENSE IN ../LICENSE",
+  "author": "Rahul Sethi",
+  "homepage": "https://github.com/rahulsethi/SAPDatasphereMCP",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rahulsethi/SAPDatasphereMCP.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rahulsethi/SAPDatasphereMCP/issues"
+  },
+  "bin": {
+    "sap-datasphere-mcp": "bin/sap-datasphere-mcp.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node ./bin/sap-datasphere-mcp.js --version"
+  }
+}

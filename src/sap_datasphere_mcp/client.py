@@ -1,6 +1,6 @@
 # SAP Datasphere MCP Server
 # File: client.py
-# Version: v12
+# Version: v13 (1.0)
 """High-level client for SAP Datasphere REST APIs.
 
 Implements:
@@ -13,20 +13,23 @@ Implements:
 - get_catalog_asset() for per-asset catalog metadata
 - get_relational_metadata() for relational OData $metadata
 
-Notes on URL variants (v0.3+ hardening):
-- Older tenants / endpoints may expose:   /api/v1/dwc/consumption/...
-- Newer/official format is:              /api/v1/datasphere/consumption/...
-- Relational view consumption sometimes requires a 'view_id' segment:
-    /consumption/relational/<space>/<view_id>/<space>/<asset_id>/<asset_id>
-  We fall back by assuming view_id == asset_name when needed.
+Notes on URL variants (v1.0 path migration):
 
-Catalog variants (v12):
-- Try /api/v1/dwc/catalog/... first
-- Fall back to /api/v1/datasphere/catalog/... on 404/405
+- The modern path is ``/api/v1/datasphere/...`` (Datasphere Wave 2025.19+).
+- The legacy ``/api/v1/dwc/...`` path is deprecated; supported by SAP through
+  March 2027.
+- v1.0 defaults to **modern first, legacy fallback** on 404/405.
+- Set ``DATASPHERE_API_PATH_LEGACY=1`` to flip the order for tenants stuck on
+  an older wave.
+
+The Catalog moved further under ``/consumption/catalog/`` in the modern
+shape; we list both ``/datasphere/catalog`` and ``/datasphere/consumption/catalog``
+so we cover tenants on either layout.
 """
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -36,6 +39,11 @@ from httpx import HTTPStatusError, RequestError
 from .auth import OAuthClient
 from .config import DatasphereConfig
 from .models import Asset, QueryResult, Space
+
+
+def _legacy_paths_first() -> bool:
+    raw = os.environ.get("DATASPHERE_API_PATH_LEGACY", "")
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 @dataclass
@@ -57,24 +65,40 @@ class DatasphereClient:
             )
         return self.config.tenant_url.rstrip("/")
 
+    @property
+    def path_mode(self) -> str:
+        """Return ``"legacy"`` or ``"modern"`` for diagnostics."""
+        return "legacy" if _legacy_paths_first() else "modern"
+
     def _catalog_prefixes(self) -> List[str]:
+        """Return catalog base prefixes in fallback order.
+
+        v1.0 default: modern (``/api/v1/datasphere/...``) first; legacy
+        (``/api/v1/dwc/...``) fallback. Flip via ``DATASPHERE_API_PATH_LEGACY=1``.
+
+        Both ``/datasphere/catalog`` and ``/datasphere/consumption/catalog``
+        are listed for the modern shape because the Catalog moved further
+        under the Consumption tree in Wave 2025.19.
+        """
         base = self._base_url()
-        return [
-            f"{base}/api/v1/dwc/catalog",
+        modern = [
+            f"{base}/api/v1/datasphere/consumption/catalog",
             f"{base}/api/v1/datasphere/catalog",
         ]
+        legacy = [f"{base}/api/v1/dwc/catalog"]
+        return (legacy + modern) if _legacy_paths_first() else (modern + legacy)
 
     def _consumption_prefixes(self) -> List[str]:
         """Return consumption base prefixes in fallback order.
 
-        We try the legacy '/dwc' form first to preserve backward compatibility,
-        then fall back to the newer '/datasphere' form.
+        v1.0 default: modern (``/api/v1/datasphere/consumption``) first; legacy
+        (``/api/v1/dwc/consumption``) fallback. Flip via
+        ``DATASPHERE_API_PATH_LEGACY=1``.
         """
         base = self._base_url()
-        return [
-            f"{base}/api/v1/dwc/consumption",
-            f"{base}/api/v1/datasphere/consumption",
-        ]
+        modern = f"{base}/api/v1/datasphere/consumption"
+        legacy = f"{base}/api/v1/dwc/consumption"
+        return [legacy, modern] if _legacy_paths_first() else [modern, legacy]
 
     async def _get_with_fallback(
         self,

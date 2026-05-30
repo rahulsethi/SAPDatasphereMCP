@@ -1,378 +1,85 @@
-
 # SAP Datasphere MCP Server
 
-An experimental [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that lets AI agents talk to **SAP Datasphere**.
+> **v1.0.0** — Read-only. API Policy v4/2026 aligned. Sibling to [SAPBDCMCP](https://github.com/rahulsethi/SAPBDCMCP).
 
-The server exposes a small, focused set of **read-only** tools to:
-
-- Discover spaces and catalog assets
-- Preview relational data
-- Describe schemas from samples
-- Run simple relational queries
-- Search for assets and columns across spaces
-- Profile columns with LLM-friendly summaries
-- Inspect metadata & diagnostics to understand “what is this thing?”
-
-**Current status: `v0.3.1` – cleanup & reorganization on top of v0.3.0 (analytical querying + deterministic summaries, caching, and safer defaults). Still preview.**  
-APIs may still change in future versions.
-
----
-
-## ✨ What’s new in v0.3.0 (on top of v0.2.0)
-
-- **Analytical querying**: `datasphere_query_analytical` (select / filter / order / paging) for assets exposed via the analytical consumption API.
-- **Deterministic summaries**: `datasphere_summarize_asset`, `datasphere_summarize_space`, `datasphere_summarize_column_profile`, and `datasphere_compare_assets_basic`.
-- **Metadata TTL cache**: faster repeated calls for discovery tools (configurable TTL + max entries).
-- **Configurable safety caps**: hard limits for row-returning tools and search results via env vars.
-- **OAuth/config hardening**: safer defaults (TLS verify on), better errors, and a Basic-auth token flow.
-- **Docs & packaging**: aligned tool names/docs and a cleaner release path.
-
-## ✨ What’s new in v0.2.0 (on top of v0.1.0)
-
-v0.1.0 gave you the basics: spaces, asset listings, previews, simple relational queries, search, and a lightweight column profile.
-
-v0.2.0 focuses on **metadata, discovery, and better signals for LLMs**:
-
-- **Richer catalog metadata** *(added in v0.2.0)*  
-  - `datasphere_get_asset_metadata` – one place to get labels, type, descriptions, and which APIs (relational/analytical) are exposed for an asset.
-
-- **Column-level introspection** *(added in v0.2.0)*  
-  - `datasphere_list_columns` – lists columns using `$metadata` when possible (types, key flags, nullability) with a preview-based fallback.
-
-- **Column search across spaces** *(added in v0.2.0)*  
-  - `datasphere_find_assets_with_column` – scan one space for assets with a given column.  
-  - `datasphere_find_assets_by_column` – scan multiple spaces with safety caps (max spaces / assets per space).
-
-- **Richer profiling for a single column** *(extended in v0.2.0)*  
-  - `datasphere_profile_column` now includes:
-    - counts & distincts,
-    - numeric stats: min, max, mean, **p25/p50/p75**, IQR, fences, outlier count,
-    - **categorical summary** for low-cardinality columns (top values & fractions),
-    - a coarse **`role_hint`** (`"id"`, `"measure"`, `"dimension"`) to help LLMs reason about semantics.
-
-- **Diagnostics & identity helpers** *(added in v0.2.0)*  
-  - Additional tools to inspect MCP & environment configuration, report mock/live mode, and expose “who am I talking to?” style information in a structured way.  
-    (Handy when your AI is debugging connection issues.)
-
-- **Mock mode for demos** *(added in v0.2.0)*  
-  - `DATASPHERE_MOCK_MODE=1` switches the client to a small in-memory demo dataset so you can try tools without a real tenant.
-
-Everything remains **read-only** against your Datasphere tenant.
-
----
-
-## 🚦 Feature overview (v0.3.0)
-
-This section describes the main tool groups and how they fit together.
-
-1. **Connectivity & diagnostics**
-   - `datasphere_ping`
-   - `datasphere_diagnostics`
-   - `datasphere_get_tenant_info`
-   - `datasphere_get_current_user`
-   - `datasphere_plugins_status` *(v0.3.0)*
-
-2. **Spaces & assets**
-   - `datasphere_list_spaces`
-   - `datasphere_list_assets`
-   - **TTL cache** *(v0.3.0)* for common discovery calls (configurable via env vars)
-
-3. **Data preview & querying**
-   - `datasphere_preview_asset` *(sample rows)*
-   - `datasphere_query_relational` *(OData-style relational queries)*
-   - `datasphere_query_analytical` *(v0.3.0, analytical consumption when exposed)*
-   - **Guardrails** *(v0.3.0)*: `$top` is clamped per-tool; responses include requested vs effective limits in `meta`
-
-4. **Metadata & discovery**
-   - `datasphere_get_asset_metadata`
-   - `datasphere_list_columns` *(prefers `$metadata`, falls back to sample inference)*
-   - `datasphere_search_assets`, `datasphere_find_assets_with_column`, `datasphere_find_assets_by_column`
-
-5. **Deterministic summaries & comparisons** *(v0.3.0)*
-   - `datasphere_summarize_asset`
-   - `datasphere_summarize_space`
-   - `datasphere_summarize_column_profile`
-   - `datasphere_compare_assets_basic`
-
-6. **Profiling & quick EDA**
-   - `datasphere_describe_asset_schema`
-   - `datasphere_profile_column` *(numeric + categorical stats, plus a role hint when possible)*
-
-All tools are intentionally **read-only** and designed to be safe to call from LLMs.
-
-
-## ✨ Features (v0.1.0)
-
-This section reflects the **original feature set introduced in v0.1.0**.  
-All of these remain available in v0.3.0.
-
-All features are **read-only** against your Datasphere tenant.
-
-### Health & connectivity
-
-- `datasphere_ping`  
-  Check that configuration & OAuth are at least sane.  
-  TLS verification can be relaxed for corporate proxies (`DATASPHERE_VERIFY_TLS=0`).
-
-### Spaces & catalog
-
-- `datasphere_list_spaces`  
-  List visible Datasphere spaces.
-
-- `datasphere_list_assets`  
-  List catalog assets (tables/views/models) in a given space.
-
-### Data preview & querying
-
-- `datasphere_preview_asset`  
-  Fetch a small sample of rows from a relational asset.
-
-- `datasphere_query_relational`  
-  Run simple OData-style relational queries with:
-
-  - `$select`
-  - `$filter`
-  - `$orderby`
-  - `$top`
-  - `$skip`
-
-### Schema & profiling
-
-- `datasphere_describe_asset_schema`  
-  Sample-based column summary: names, example values, rough type inference, and simple null counts.
-
-- `datasphere_profile_column`  
-  Quick profile for a single column: sample size, null count, distinct count, basic numeric stats (min / max / mean).
-
-### Search & summaries
-
-- `datasphere_search_assets`  
-  Fuzzy search assets by name / id across spaces.
-
-- `datasphere_space_summary`  
-  Small overview of a space: asset counts by type + a sample list of assets.
-
-There are also a few **demo scripts** for local smoke-testing without an MCP client.
-
----
-## 🧱 Architecture (high level)
-
-Very roughly:
+An open-source [Model Context Protocol](https://modelcontextprotocol.io/) server that lets AI agents — Claude, Cursor, or any MCP-compatible client — safely explore an **SAP Datasphere** tenant. Discover spaces, list assets, preview rows, profile columns, search by column name, and summarize analytical models — all through a clean, read-only tool surface that respects SAP's API governance posture.
 
 ```text
-MCP client (e.g. Claude Desktop)
+MCP host (Claude Desktop, Cursor, ...)
         │
         ▼
-MCP stdio transport  ──>  FastMCP server  ──>  tools/tasks.py (MCP tools)
-                                               │
-                                               ▼
-                                         DatasphereClient
-                                               │
-                                               ▼
-                            SAP Datasphere REST APIs (Catalog & Consumption)
+sap-datasphere-mcp  ──>  FastMCP server  ──>  tools/registry  ──>  category facades
+                                                                   │
+                                                                   ▼
+                                          DatasphereClient (httpx)  ──>  /api/v1/datasphere/* (modern)
+                                                                   ──>  /api/v1/dwc/* (legacy fallback)
+                                          policy / audit / redaction interceptor chain
 ```
 
-- The `sap-datasphere-mcp` console script starts a stdio MCP server.
-- `tools/tasks.py` defines all MCP tools and wires them to `DatasphereClient`.
-- `DatasphereClient` wraps the Datasphere Catalog & Consumption APIs using `httpx`
-  and returns simple JSON-serialisable structures.
+---
+
+## Highlights
+
+- **24 read-only tools** across `connectivity`, `catalog`, `query`, `discover`, `profile`, `summarize`, `governance`.
+- **5 MCP Prompts** and **4 MCP Resources** — first SAP MCP server to ship either.
+- **SAP API Policy v4/2026 aligned** — documented posture, optional audit log, redaction layer, Integration Suite **MCP Gateway** as the recommended enterprise deployment path.
+- **Sibling to [SAPBDCMCP](https://github.com/rahulsethi/SAPBDCMCP)** — same maintainer, same naming, same license model. Run them side-by-side in the same MCP host.
+- **No write tools, ever.** Hard guarantee for the 1.x line.
+- **OAuth 2.0 client_credentials** with optional **mTLS** via IAS.
+- **stdio + streamable-HTTP** transports; optional bearer auth on HTTP.
 
 ---
 
-## ✅ Requirements
-
-- Python **3.10+** (developed and tested on 3.14).
-- A working **SAP Datasphere** tenant (unless you run in mock mode).
-- A **technical OAuth client** with:
-  - token URL,
-  - client ID,
-  - client secret,
-  - permission to call the Catalog & Consumption APIs.
-
-This project is aimed at technical users who are comfortable with:
-
-- environment variables,
-- basic command-line usage, and
-- SAP Datasphere / SAP BTP concepts.
-
----
-
-## 🚀 Installation
-
-### Option 1 – Install directly from GitHub (recommended for users)
-
-In any virtual environment where you want to use the MCP server:
+## Install — pick one
 
 ```bash
-pip install "git+https://github.com/rahulsethi/SAPDatasphereMCP.git"
+# uv / uvx — fastest, no global install
+uvx sap-datasphere-mcp
+
+# pip / pipx
+pip install sap-datasphere-mcp        # or:  pipx install sap-datasphere-mcp
+
+# npm (npx-wrapper bootstraps the Python package via uvx)
+npx -y @rahulsethi/sap-datasphere-mcp
 ```
 
-This installs:
-
-- the `sap_datasphere_mcp` package,
-- the `sap-datasphere-mcp` console script, and
-- the required dependencies (`mcp`, `httpx`, `pydantic`, …).
-
-### Option 2 – Clone the repo (recommended for contributors)
-
-```bash
-git clone https://github.com/rahulsethi/SAPDatasphereMCP.git
-cd SAPDatasphereMCP
-
-# Create and activate a virtualenv
-
-# Windows (PowerShell)
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-# macOS / Linux (bash/zsh)
-python -m venv .venv
-source .venv/bin/activate
-
-# Install in editable (dev) mode
-pip install -e ".[dev]"
-```
-
-This gives you the same console script plus dev tools like `pytest` for local tests.
+Full install guide and Claude Desktop / Cursor wiring is in [`public_docs/INSTALLATION.md`](public_docs/INSTALLATION.md).
 
 ---
 
-## ⚙️ Configure SAP Datasphere credentials
+## Configure
 
-The MCP server reads its configuration from environment variables via
-`DatasphereConfig.from_env()`.
+Four env vars are required, the rest are optional. Copy [`.env.example`](.env.example) or `set-datasphere-env.example.ps1` to a local file and fill in:
 
-At minimum you need:
-
-- `DATASPHERE_TENANT_URL`  
-  Base URL of your Datasphere tenant  
-  e.g. `https://your-tenant-id.eu10.hcs.cloud.sap`
-
-- `DATASPHERE_OAUTH_TOKEN_URL`  
-  OAuth token endpoint for your technical client  
-  e.g. `https://your-uaa-domain/oauth/token`
-
-- `DATASPHERE_CLIENT_ID`  
-  Client ID of your technical OAuth client.
-
-- `DATASPHERE_CLIENT_SECRET`  
-  Client secret of your technical OAuth client.
-
-Optional:
-
-- `DATASPHERE_VERIFY_TLS`  
-  - `"1"` or unset: verify TLS certificates (default, recommended).  
-  - `"0"`: **disable** TLS verification (only if you’re behind a corporate proxy
-    with self-signed certs and you understand the risks).
-
-- `DATASPHERE_MOCK_MODE` *(added in v0.2.0)*  
-  - `"1"`: use an in-memory mock Datasphere client with a tiny demo dataset.  
-  - `"0"` or unset: connect to the real Datasphere tenant using the OAuth details above.
-
-### Example (PowerShell helper script, Windows)
-
-Copy the template that ships with the repo and fill in real values:
-
-```powershell
-Copy-Item set-datasphere-env.example.ps1 set-datasphere-env.ps1
-# Edit set-datasphere-env.ps1 and replace the <your-*> placeholders.
+```bash
+export DATASPHERE_TENANT_URL=https://<your-tenant>.<region>.hcs.cloud.sap
+export DATASPHERE_OAUTH_TOKEN_URL=https://<your-uaa>/oauth/token
+export DATASPHERE_CLIENT_ID=<your-technical-client>
+export DATASPHERE_CLIENT_SECRET=<your-client-secret>
 ```
 
-The local `set-datasphere-env.ps1` is gitignored, so your secrets never leave
-your machine. The template looks like this:
+Optional knobs you'll reach for most often:
 
-```powershell
-$env:DATASPHERE_TENANT_URL      = 'https://<your-tenant>.<region>.hcs.cloud.sap'
-$env:DATASPHERE_OAUTH_TOKEN_URL = 'https://<your-uaa-domain>/oauth/token'
-$env:DATASPHERE_CLIENT_ID       = '<your-client-id>'
-$env:DATASPHERE_CLIENT_SECRET   = '<your-client-secret>'
+| Env var | Purpose | Default |
+|---|---|---|
+| `DATASPHERE_MOCK_MODE` | Run in-memory; no real tenant. | `0` |
+| `DATASPHERE_API_PATH_LEGACY` | Force legacy `/api/v1/dwc/*` first. | `0` |
+| `DATASPHERE_AUDIT_ENABLED` | Write a JSONL audit log per tool call. | `0` |
+| `DATASPHERE_OAUTH_MTLS_CERT` / `_KEY` | mTLS-bound client_credentials via IAS. | unset |
+| `DATASPHERE_MCP_BEARER_TOKEN` | Bearer auth for the HTTP transport. | unset |
 
-# Optional: skip TLS verification for self-signed corporate proxies
-# (only if you understand the security implications)
-# $env:DATASPHERE_VERIFY_TLS = '0'
-
-# Optional: run in mock mode without a real tenant (v0.2.0)
-# $env:DATASPHERE_MOCK_MODE = '1'
-```
-
-Then in each new shell:
-
-```powershell
-.\set-datasphere-env.ps1
-```
-
-On macOS / Linux you can do the same with an `export`-based shell script.
+Full env table: see [`public_docs/INSTALLATION.md`](public_docs/INSTALLATION.md) and [`docs/v1.0/Architecture_v1.0.md`](docs/v1.0/Architecture_v1.0.md) §7.
 
 ---
 
-## 🧪 Local smoke tests
-
-With env vars set and your virtualenv active:
+## Quick start
 
 ```bash
-pytest
+sap-datasphere-mcp --version    # sap-datasphere-mcp 1.0.0
+sap-datasphere-mcp              # starts the stdio MCP server
 ```
 
-Then try the demo scripts in [`examples/`](examples/) (see [`examples/README.md`](examples/README.md) for the full catalogue):
-
-```bash
-# List spaces via MCP tasks
-python examples/demo_mcp_list_spaces.py
-
-# List assets in a specific space (set DATASPHERE_TEST_SPACE first)
-python examples/demo_mcp_list_assets.py
-
-# Preview data (with optional filter)
-python examples/demo_mcp_preview_filtered.py
-
-# Describe schema from a sample
-python examples/demo_mcp_describe_asset.py
-
-# Query with filter/sort/select/skip
-python examples/demo_mcp_query_relational.py
-
-# Search assets by name / id
-python examples/demo_mcp_search_assets.py
-
-# Summarise a space
-python examples/demo_mcp_space_summary.py
-
-# Profile one column
-python examples/demo_mcp_profile_column.py
-```
-
-Each script prints JSON-like results so you can see exactly what MCP tools
-return to an AI agent. The `examples/smoke_*.py` scripts hit your real tenant
-for quick sanity checks; they are not part of the pytest suite.
-
----
-
-## 🖥️ Running the MCP server
-
-To start the stdio MCP server:
-
-```bash
-sap-datasphere-mcp
-```
-
-The process will listen on stdin/stdout using JSON-RPC as defined by MCP.  
-You normally don’t talk to this directly; an MCP-compatible client
-(e.g. Claude Desktop) launches it and sends requests over stdio.
-
-If `DATASPHERE_MOCK_MODE=1` is set, the server will run entirely in-memory
-against a small demo dataset (v0.2.0).
-
----
-
-## 🤖 Using with Claude Desktop (example)
-
-Exact config file locations differ by OS and Claude version;  
-check Anthropic’s docs for current paths.
-
-Conceptually, you add an entry under `mcpServers` telling Claude how to start
-your server and what env vars to pass.
-
-Example `mcpServers` entry (JSON, comments removed):
+Then add this to your MCP host config (Claude Desktop / Cursor):
 
 ```json
 {
@@ -381,288 +88,128 @@ Example `mcpServers` entry (JSON, comments removed):
       "command": "sap-datasphere-mcp",
       "args": [],
       "env": {
-        "DATASPHERE_TENANT_URL": "https://your-tenant-id.eu10.hcs.cloud.sap",
-        "DATASPHERE_OAUTH_TOKEN_URL": "https://your-uaa-domain/oauth/token",
-        "DATASPHERE_CLIENT_ID": "your-client-id",
-        "DATASPHERE_CLIENT_SECRET": "your-client-secret",
-        "DATASPHERE_VERIFY_TLS": "1"
+        "DATASPHERE_TENANT_URL": "https://...",
+        "DATASPHERE_OAUTH_TOKEN_URL": "https://.../oauth/token",
+        "DATASPHERE_CLIENT_ID": "...",
+        "DATASPHERE_CLIENT_SECRET": "..."
       }
     }
   }
 }
 ```
 
-After editing the config, restart Claude Desktop.  
-The new MCP server should appear in the list of tools the model can call.
+Try a first prompt: *"Show me the SAP Datasphere spaces in my tenant."*
 
----
-## 🔧 MCP tools – quick reference (with version tags)
-
-All tools live in `sap_datasphere_mcp.tools.tasks` and are registered on the
-MCP server under the names below.
-
-**Health & discovery**
-
-- `datasphere_ping` *(since v0.1.0)*  
-  Basic connectivity check – returns `{ "ok": bool }`.
-
-- `datasphere_diagnostics` *(added in v0.2.0)*  
-  Runs a small set of health checks (client init, ping, list_spaces) and returns
-  a structured diagnostics report including mock/live mode and elapsed time.
-
-- `datasphere_get_tenant_info` *(added in v0.2.0)*  
-  Redacted snapshot of tenant configuration (URLs, region hint, TLS settings, OAuth presence) – never returns secrets.
-
-- `datasphere_get_current_user` *(added in v0.2.0)*  
-  Describes the current Datasphere identity context (technical user vs mock mode) in a safe, high-level way.
-
-**Spaces & catalog**
-
-- `datasphere_list_spaces` *(since v0.1.0)*  
-  List visible Datasphere spaces.
-
-- `datasphere_list_assets` *(since v0.1.0)*  
-  List catalog assets in a given space (id, name, type, description).
-
-- `datasphere_get_asset_metadata` *(added in v0.2.0)*  
-  Fetch catalog metadata for a single asset: ids, name, label, description, type,
-  relational/analytical exposure flags, useful URLs, plus raw payload.
-
-**Data preview & querying**
-
-- `datasphere_preview_asset` *(since v0.1.0)*  
-  Fetch a small sample of rows from an asset:
-  - `columns`, `rows`, `truncated`, `meta`.
-
-- `datasphere_query_relational` *(since v0.1.0)*  
-  Relational query helper with:
-  - `$select`, `$filter`, `$orderby`, `$top`, `$skip` reflected in `meta`.
-
-**Schema & profiling**
-
-- `datasphere_describe_asset_schema` *(since v0.1.0)*  
-  Infer column-oriented schema from a sample: column names, rough Python types,
-  null counts, example values.
-
-- `datasphere_list_columns` *(added in v0.2.0)*  
-  List columns via relational `$metadata` (EDMX/XML) when available, falling back
-  to preview-based inference. Includes type, key flag, nullability where possible.
-
-- `datasphere_profile_column`  
-  - *(v0.1.0)* basic profile: sample size, null count, distinct count, min, max, mean for numeric columns.  
-  - *(extended in v0.2.0)* adds:
-    - percentiles (p25, p50, p75),
-    - IQR and outlier fences,
-    - outlier count,
-    - categorical summary for low-cardinality columns,
-    - `role_hint` (`"id"`, `"measure"`, `"dimension"`).
-
-**Search & summaries**
-
-- `datasphere_search_assets` *(since v0.1.0)*  
-  Substring search on asset id, name, description, or type across one or many spaces.
-
-- `datasphere_space_summary` *(since v0.1.0)*  
-  Overview of a space: total assets, counts by type, sample list of assets.
-
-- `datasphere_find_assets_with_column` *(added in v0.2.0)*  
-  Within a single space, scan up to `max_assets` to find assets that expose a
-  given column name (case-insensitive, exact match).
-
-- `datasphere_find_assets_by_column` *(added in v0.2.0)*  
-  Similar to the above, but across multiple spaces with caps on:
-  - number of spaces scanned,
-  - assets per space,
-  - total matches returned (`limit`).
+A richer one: *"Profile the EMPLOYEES asset in the HR_SPACE space."* — this drives our `profile_dataset` MCP Prompt automatically.
 
 ---
 
-### Example response shape (preview)
+## Tool catalog
 
-A typical `datasphere_preview_asset` response looks like:
+24 tools organized as:
 
-```json
-{
-  "columns": ["EMP_ID", "FIRST_NAME", "LAST_NAME"],
-  "rows": [
-    [101, "Rudransh", "Sharma"],
-    [102, "Anita", "Müller"]
-  ],
-  "truncated": false,
-  "meta": {
-    "space_id": "HR_SPACE",
-    "asset_name": "EMP_VIEW_TEST",
-    "top": 20
-  }
-}
+- **Connectivity (5)** — `ping`, `diagnostics`, `tenant_info`, `whoami`, `plugins_status`
+- **Catalog (5)** — `list_spaces`, `list_assets`, `get_asset`, `list_columns`, `space_overview`
+- **Query (3)** — `preview`, `relational`, `analytical`
+- **Discover (3)** — `assets`, `assets_with_column`, `assets_by_column`
+- **Profile (2)** — `schema`, `column`
+- **Summarize (4)** — `asset`, `space`, `column_profile`, `compare_assets`
+- **Governance (2)** — `api_policy_check`, `audit_tail`
+
+Every tool is prefixed `datasphere_<category>_`. Every tool is `readOnly`; none are `destructive`. Full reference with args + return shapes: [`public_docs/TOOLS.md`](public_docs/TOOLS.md).
+
+### MCP Prompts (first in the SAP ecosystem)
+
+| Prompt | Args | What it does |
+|---|---|---|
+| `profile_dataset` | `space_id`, `asset_name` | Schema + sample + per-column profile + narrative summary |
+| `audit_space` | `space_id` | Inventory & governance report for a space |
+| `explain_analytical_model` | `space_id`, `asset_name` | Plain-English explanation of dimensions, measures, hierarchies |
+| `compare_assets` | `space_a`, `asset_a`, `space_b`, `asset_b` | Structural comparison + relationship inference |
+| `find_data_about_topic` | `topic`, optional `space_ids` | Multi-space discovery for an analytic question |
+
+### MCP Resources
+
+```
+datasphere://space/{space_id}
+datasphere://space/{space_id}/asset/{asset_name}
+datasphere://space/{space_id}/asset/{asset_name}/schema
+datasphere://space/{space_id}/asset/{asset_name}/sample
 ```
 
-All other tools follow a similar pattern: small, predictable JSON structures that
-are easy for LLMs (and humans) to reason about.
+Let your MCP host pre-load context without a tool call.
 
 ---
 
-## 📜 Changelog
+## Architecture (high level)
 
-The canonical changelog lives at [`CHANGELOG.md`](CHANGELOG.md). A summary of
-the most recent releases is mirrored below.
+The boot path is `transports/stdio_server.py` → `server.create_server()` → `tools.registry.register_all()` → category facade modules → the 22 async implementations in `tools/tasks.py`. Each tool call goes through a small interceptor chain: **policy gate → audit start → tool → redaction → audit commit**.
 
-
-### [0.3.1] – Cleanup & reorganization
-
-- Moved root-level `demo_*.py` and ad-hoc `test_*.py` scripts to `examples/`
-  (`test_*.py` renamed to `smoke_*.py` so pytest no longer collects them).
-- Deleted unreachable `tools/{catalog,spaces,connections,data}.py` and the
-  unused `register_all_tools()` helper.
-- Made `docs/` tracked in the repo (previously gitignored).
-- Removed the 18 MB demo MP4 from the working tree to shrink clones.
-- Added `set-datasphere-env.example.ps1`; the real `set-datasphere-env.ps1`
-  stays gitignored.
-- No public API or behavior changes.
-
-
-### [0.3.0]
-### Added
-- Configurable guardrails for row-returning tools and search results (caps enforced in tool layer).
-- Metadata-focused TTL cache to reduce repeated backend calls for discovery/metadata tools.
-- Analytical querying tool: `datasphere_query_analytical`.
-- Deterministic summary tools:
-  - `datasphere_summarize_asset`
-  - `datasphere_summarize_space`
-  - `datasphere_summarize_column_profile`
-- Asset comparison helper: `datasphere_compare_assets_basic`.
-- Plugin observability tool: `datasphere_plugins_status` (also surfaced in diagnostics output).
-
-### Changed
-- Tool responses now include clearer `meta` fields (requested vs effective limits, cap applied flags) to make truncation explicit.
-- OAuth client hardened (client-credentials via HTTP Basic auth + token caching + clearer errors).
-- Config expanded for TLS verification toggle, caps, and cache settings.
-
-### Fixed
-- Normalized handling for optional query metadata to avoid `None`-shaped surprises in tool responses.
-
-
+Full architecture write-up: [`docs/v1.0/Architecture_v1.0.md`](docs/v1.0/Architecture_v1.0.md). Decisions log: [`docs/v1.0/Decisions_v1.0.md`](docs/v1.0/Decisions_v1.0.md).
 
 ---
 
-### 0.2.0 – Metadata & Diagnostics expansion
+## API Policy v4/2026 posture
 
-> Status: in development / preview.
+This server consumes only **SAP-documented** Datasphere Catalog and Consumption APIs via OAuth 2.0 client_credentials (the technical-user pattern). It does not scrape, reverse-engineer, or proxy non-public APIs. It is **read-only by construction** — there are no write/admin tools and there will never be any in the 1.x line.
 
-### Added
-
-- **Catalog metadata helper**
-  - `datasphere_get_asset_metadata` to fetch labels, descriptions, type and
-    relational/analytical exposure flags for a single asset, plus raw payload.
-
-- **Column-level introspection**
-  - `datasphere_list_columns` to list columns using relational `$metadata`
-    (EDMX/XML) when available, with preview-based fallback.
-
-- **Column search across spaces**
-  - `datasphere_find_assets_with_column` to find assets exposing a given column
-    in a single space.
-  - `datasphere_find_assets_by_column` to search across multiple spaces with
-    limits on spaces and assets scanned.
-
-- **Richer column profiling**
-  - Extended `datasphere_profile_column` with:
-    - numeric percentiles (p25, p50, p75),
-    - IQR and Tukey-style fences,
-    - outlier count,
-    - categorical summary for low-cardinality columns,
-    - heuristic `role_hint` (`"id"`, `"measure"`, `"dimension"`).
-
-- **Diagnostics & identity helpers**
-  - `datasphere_diagnostics` to run high-level MCP & tenant health checks.
-  - `datasphere_get_tenant_info` to inspect redacted configuration (URLs, region hint, TLS, OAuth presence).
-  - `datasphere_get_current_user` to describe the current identity context
-    (technical user vs mock mode) without exposing secrets.
-
-- **Mock mode**
-  - Support for `DATASPHERE_MOCK_MODE=1`, enabling a small in-memory demo
-    dataset for local testing and demos without a real tenant.
-
-- **Packaging metadata**
-  - `pyproject.toml` updated with:
-    - project name `mcp-sap-datasphere-server` (planned PyPI distribution name),
-    - explicit `src/sap_datasphere_mcp` package configuration for Hatch.
-
-### Changed
-
-- `datasphere_profile_column` now returns a richer `numeric_summary` and
-  optional `categorical_summary` and `role_hint`.
-- Internals of `tools/tasks.py` refactored to support both real `DatasphereClient`
-  and `MockDatasphereClient`.
-- Documentation updated to:
-  - distinguish clearly between v0.1.0 and v0.2.0 features,
-  - describe diagnostics, mock mode and metadata tools,
-  - mention the planned PyPI distribution name.
-
-### Fixed
-
-- Improved error handling and more structured `meta` blocks in several tools.
-- Clarified documentation around environment variables and TLS verification.
+For production deployments, we recommend wrapping this server behind the **SAP Integration Suite MCP Gateway**, which inherits SAP-sanctioned metering, agent identity, audit, and rate limiting. See [`public_docs/SAP_API_POLICY.md`](public_docs/SAP_API_POLICY.md) for the full disclosure, the three-tier deployment guide, and the `datasphere_governance_api_policy_check` tool you can call to print the deployment's current posture.
 
 ---
 
-### 0.1.0 – First public preview
+## Family
 
-> Initial GitHub release.
+**SAPBDCMCP** — the same maintainer ships a sibling MCP server for **SAP Business Data Cloud** at [https://github.com/rahulsethi/SAPBDCMCP](https://github.com/rahulsethi/SAPBDCMCP). Same naming conventions (`<product>_<category>_<verb>`), same license model, same read-only enterprise posture. If you operate across Datasphere and BDC, run them side-by-side in Claude Desktop and switch between them mid-conversation — neither your agent nor you have to context-switch.
 
-### Added
+A **2-for-1 family discount** is available on commercial licenses for both.
 
-- **Health & connectivity**
-  - `datasphere_ping` to check basic configuration & OAuth.
+---
 
-- **Spaces & catalog**
-  - `datasphere_list_spaces` to list visible Datasphere spaces.
-  - `datasphere_list_assets` to list catalog assets in a given space.
+## Migration from v0.3.x
 
-- **Data preview & relational querying**
-  - `datasphere_preview_asset` for small row samples.
-  - `datasphere_query_relational` for simple `$select` / `$filter` /
-    `$orderby` / `$top` / `$skip` queries.
+In short:
 
-- **Schema & profiling**
-  - `datasphere_describe_asset_schema` for sample-based column summaries.
-  - `datasphere_profile_column` for basic column profiling
-    (counts, distincts, min / max / mean for numeric columns).
+```bash
+pip uninstall mcp-sap-datasphere-server
+pip install sap-datasphere-mcp
+```
 
-- **Search & summaries**
-  - `datasphere_search_assets` for fuzzy search across spaces.
-  - `datasphere_space_summary` for quick space-level overviews.
+The 22 old tool names continue to work through v1.1 as deprecation aliases. Update your Claude Desktop / Cursor configs to the new `datasphere_<category>_<verb>` names before v1.2 (~Q4 2026). Full guide with the rename table: [`public_docs/MIGRATION.md`](public_docs/MIGRATION.md).
 
-- **Tooling & demos**
-  - Initial demo scripts (`demo_mcp_*`) for local smoke tests.
-  - Basic documentation and instructions for using the MCP server with
-    Claude Desktop.
+---
 
-## 🔢 Versioning
+## Versioning
 
-Current version: **0.3.1**.
+Current: **1.0.0** — SemVer-stable through the 1.x line. Tool names, argument shapes, prompt names, and resource URIs are public contract.
 
-- **0.3.1 – cleanup & reorganization (current)**
-  - Demos and smoke scripts moved to `examples/`; pytest suite untouched in `tests/`
-  - Deleted unreachable `tools/` submodules (boot path was bypassing them)
-  - `docs/` now tracked in the repo; canonical changelog at root `CHANGELOG.md`
-  - No behavior changes
-- **0.3.0 – analytical + summaries**
-  - Analytical consumption tool: `datasphere_query_analytical`
-  - Deterministic summaries: `datasphere_summarize_asset/space/column_profile`, `datasphere_compare_assets_basic`
-  - TTL cache + configurable caps for safer LLM-driven exploration
-- **0.2.0 – metadata & diagnostics**
-  - Discovery tools: `datasphere_get_asset_metadata`, `datasphere_list_columns`, `datasphere_search_assets`
-  - Mock mode and improved diagnostics tooling
-- **0.1.0 – initial GitHub release**
-  - Basic MCP wiring + relational exploration
+Recent releases:
 
-A detailed, version-by-version log lives in `CHANGELOG.md` (and is mirrored above in the **Changelog** section).
+- **1.0.0** — *graduation*: family alignment, API path migration, governance layer, MCP prompts + resources, PolyForm relicense. (This release.)
+- **0.3.1** — *cleanup*: examples folder, dead code removal, docs reorg.
+- **0.3.0** — analytical querying, deterministic summaries, TTL cache, configurable caps.
+- **0.2.0** — metadata, discovery, profiling extensions, mock mode.
+- **0.1.0** — initial GitHub release.
 
-## 📄 License
+Full changelog: [`CHANGELOG.md`](CHANGELOG.md).
 
-This project is released under the **MIT License**.  
-See the `LICENSE` file for details.
+---
 
-You are free to use, modify, and redistribute the code, provided you keep the
-copyright notice and license text in derivative works.
+## License
+
+**PolyForm Noncommercial 1.0.0** for v1.0+. Versions v0.3.1 and earlier remain MIT-licensed.
+
+- Personal, research, academic, and internal evaluation use: **free**.
+- Commercial use (paid consulting, embedding in a vendor product, hosted SaaS): **requires a separate commercial license**.
+
+The path is friendly and the terms are reasonable — see [`COMMERCIAL_LICENSING.md`](COMMERCIAL_LICENSING.md) for how to get one.
+
+---
+
+## Contributing
+
+Contributions accepted under the same license. No CLA required. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+## Issues / contact
+
+- Bugs / feature requests: https://github.com/rahulsethi/SAPDatasphereMCP/issues
+- Commercial licensing: open a [Discussion](https://github.com/rahulsethi/SAPDatasphereMCP/discussions) with title `[Commercial License Inquiry] <your-org>`.

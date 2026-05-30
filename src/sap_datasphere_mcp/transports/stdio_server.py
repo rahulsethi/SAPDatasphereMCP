@@ -1,40 +1,50 @@
 # SAP Datasphere MCP Server
 # File: transports/stdio_server.py
-# Version: v8
+# Version: v9 (1.0)
 
 """STDIO entrypoint for the SAP Datasphere MCP server.
 
-This is the script behind the ``sap-datasphere-mcp`` console command.
-
-It:
-
-- creates a FastMCP server,
-- registers all core Datasphere tools,
-- loads optional plugins (v0.3+), and
-- runs the built-in stdio transport.
+Backed by :func:`sap_datasphere_mcp.server.create_server` so stdio and HTTP
+boot the same way. Used by the ``sap-datasphere-mcp`` console script.
 """
 
 from __future__ import annotations
 
-from mcp.server.fastmcp import FastMCP
+import sys
 
-from ..plugins import registry as plugin_registry
-from ..tools import tasks
+from .. import __version__
+from ..server import create_server
 
 
-def main() -> None:
-    """Synchronous entrypoint for console_scripts."""
-    mcp = FastMCP("sap-datasphere-mcp")
+def main() -> int:
+    """Synchronous entrypoint for console_scripts.
 
-    # Register core MCP tools (ping, list_spaces, list_assets, preview_asset, …)
-    tasks.register_tools(mcp)
+    Recognises a few zero-arg flags so users can sanity-check the install:
 
-    # Load optional plugins (must never crash the core server).
-    plugin_registry.register_plugins(mcp)
+    - ``--version`` / ``-V`` — print the resolved version and exit
+    - ``--help`` / ``-h`` — print a short help and exit
+    """
+    argv = sys.argv[1:]
+    if argv:
+        if argv[0] in {"--version", "-V"}:
+            print(f"sap-datasphere-mcp {__version__}")
+            return 0
+        if argv[0] in {"--help", "-h"}:
+            print(
+                "sap-datasphere-mcp — read-only SAP Datasphere MCP server.\n\n"
+                "Usage:\n"
+                "  sap-datasphere-mcp                Start the stdio MCP server (default).\n"
+                "  sap-datasphere-mcp --version      Show version and exit.\n"
+                "  sap-datasphere-mcp --help         Show this help and exit.\n\n"
+                "For HTTP transport use:  python -m sap_datasphere_mcp.transports.http_server\n"
+                "Docs:  https://github.com/rahulsethi/SAPDatasphereMCP/blob/main/public_docs/INSTALLATION.md\n"
+            )
+            return 0
 
-    # Let FastMCP handle stdio + event loop setup.
+    mcp = create_server()
     mcp.run()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
