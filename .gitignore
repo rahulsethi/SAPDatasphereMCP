@@ -16,6 +16,7 @@ __pycache__/
 set-datasphere-env.ps1
 .env
 .env.*
+.pypirc
 
 # Build artifacts
 dist/
