@@ -1,0 +1,53 @@
+name: publish-pypi
+
+# Triggered when a GitHub Release is published (after the release.yml workflow creates it).
+# Uses PyPI Trusted Publishing (OIDC) — no API token stored in GitHub secrets.
+#
+# ONE-TIME SETUP on PyPI (do this before the first publish):
+#   1. Go to https://pypi.org/manage/project/sap-datasphere-mcp/settings/publishing/
+#   2. Add a new "trusted publisher":
+#        Owner:      rahulsethi
+#        Repository: SAPDatasphereMCP
+#        Workflow:   publish-pypi.yml
+#        Environment: pypi
+#   3. That's it — no PYPI_API_TOKEN secret needed.
+#
+# Fallback (API token approach):
+#   If you prefer an API token instead of trusted publishing:
+#   1. Create a token at https://pypi.org/manage/account/token/
+#   2. Add it as a GitHub secret named PYPI_API_TOKEN
+#   3. Replace the pypa/gh-action-pypi-publish step's `password` field below.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  id-token: write  # required for OIDC trusted publishing
+
+jobs:
+  publish:
+    name: publish to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/sap-datasphere-mcp/
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Build distributions
+        run: |
+          pip install build
+          python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # No password/token needed when using trusted publishing (OIDC).
+        # Uncomment the lines below if using an API token instead:
+        # with:
+        #   password: ${{ secrets.PYPI_API_TOKEN }}

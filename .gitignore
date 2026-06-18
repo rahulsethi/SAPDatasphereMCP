@@ -37,3 +37,6 @@ ruff_cache/
 
 .claude
 CLAUDE.md
+
+# Internal design docs (not for public consumption)
+docs/

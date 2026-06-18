@@ -2,6 +2,11 @@
 
 > **v1.0.0** — Read-only. API Policy v4/2026 aligned. Sibling to [SAPBDCMCP](https://github.com/rahulsethi/SAPBDCMCP).
 
+[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/sap-datasphere-mcp)](https://pypi.org/project/sap-datasphere-mcp/)
+[![Python](https://img.shields.io/pypi/pyversions/sap-datasphere-mcp)](https://pypi.org/project/sap-datasphere-mcp/)
+[![CI](https://github.com/rahulsethi/SAPDatasphereMCP/actions/workflows/ci.yml/badge.svg)](https://github.com/rahulsethi/SAPDatasphereMCP/actions/workflows/ci.yml)
+
 An open-source [Model Context Protocol](https://modelcontextprotocol.io/) server that lets AI agents — Claude, Cursor, or any MCP-compatible client — safely explore an **SAP Datasphere** tenant. Discover spaces, list assets, preview rows, profile columns, search by column name, and summarize analytical models — all through a clean, read-only tool surface that respects SAP's API governance posture.
 
 ```text
@@ -68,7 +73,7 @@ Optional knobs you'll reach for most often:
 | `DATASPHERE_OAUTH_MTLS_CERT` / `_KEY` | mTLS-bound client_credentials via IAS. | unset |
 | `DATASPHERE_MCP_BEARER_TOKEN` | Bearer auth for the HTTP transport. | unset |
 
-Full env table: see [`public_docs/INSTALLATION.md`](public_docs/INSTALLATION.md) and [`docs/v1.0/Architecture_v1.0.md`](docs/v1.0/Architecture_v1.0.md) §7.
+Full env table: see [`public_docs/INSTALLATION.md`](public_docs/INSTALLATION.md).
 
 ---
 
@@ -145,7 +150,7 @@ Let your MCP host pre-load context without a tool call.
 
 The boot path is `transports/stdio_server.py` → `server.create_server()` → `tools.registry.register_all()` → category facade modules → the 22 async implementations in `tools/tasks.py`. Each tool call goes through a small interceptor chain: **policy gate → audit start → tool → redaction → audit commit**.
 
-Full architecture write-up: [`docs/v1.0/Architecture_v1.0.md`](docs/v1.0/Architecture_v1.0.md). Decisions log: [`docs/v1.0/Decisions_v1.0.md`](docs/v1.0/Decisions_v1.0.md).
+Full architecture details and decision log are in `public_docs/` — see the [quick links](public_docs/README.md).
 
 ---
 

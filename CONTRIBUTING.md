@@ -18,8 +18,7 @@ Python **3.11+** is required.
 
 ## Project layout
 
-See [`docs/v1.0/Architecture_v1.0.md`](docs/v1.0/Architecture_v1.0.md) for the
-full architecture picture. The boot path is
+See the architecture diagram in [README.md](README.md) for the high-level picture. The boot path is
 `transports/stdio_server.py → server.create_server() → tools/registry.register_all()`.
 
 ## Where to add a new tool
@@ -43,7 +42,7 @@ full architecture picture. The boot path is
 - Errors return `{"ok": false, "error": {...}, "meta": {...}}`; never raise to
   the MCP layer.
 - Read-only contract is sacrosanct — no write tools targeting tenant admin
-  surfaces. See [ADR-010](docs/v1.0/Decisions_v1.0.md).
+  surfaces. This is a hard guarantee for the 1.x line.
 
 ## Tests
 
@@ -60,9 +59,8 @@ works.
 
 ## Releasing
 
-Releases are cut by the maintainer. The current cadence is documented in
-[`docs/v1.0/ProjectPlan_v1.0.md`](docs/v1.0/ProjectPlan_v1.0.md) section 16.
-Releases tag the `main` branch and publish to PyPI + npm + GitHub Releases.
+Releases are cut by the maintainer. Releases tag the `main` branch (`v1.2.3`)
+and publish automatically to PyPI + GitHub Releases via GitHub Actions.
 
 ## Reporting bugs
 
