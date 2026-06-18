@@ -20,11 +20,25 @@ factory so they boot identically.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 __all__ = ["create_server"]
 
 log = logging.getLogger("sap_datasphere_mcp.server")
+
+
+def _log_license_status() -> None:
+    key = os.environ.get("DATASPHERE_LICENSE_KEY", "").strip()
+    if key:
+        log.info(
+            '{"event":"commercial_license_active","key_prefix":"%s","v":"1.0.0"}',
+            key[:7],
+        )
+    else:
+        log.debug(
+            '{"event":"license_check","mode":"noncommercial","v":"1.0.0"}'
+        )
 
 
 def _load_dotenv_if_present() -> None:
@@ -42,6 +56,7 @@ def create_server() -> Any:
     start serving.
     """
     _load_dotenv_if_present()
+    _log_license_status()
 
     # Local import: keeps `import sap_datasphere_mcp` cheap (e.g. for `--version`).
     from mcp.server.fastmcp import FastMCP  # type: ignore

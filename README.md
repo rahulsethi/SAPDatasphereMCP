@@ -2,8 +2,7 @@
 
 > **v1.0.0** — Read-only. API Policy v4/2026 aligned. Sibling to [SAPBDCMCP](https://github.com/rahulsethi/SAPBDCMCP).
 
-[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyFor
-m%20Noncommercial%201.0.0-blue)](LICENSE)
+[![License: BSL 1.1](https://img.shields.io/badge/license-BSL%201.1-blue)](LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/mcp-sap-datasphere-server)](https://pypi.org/project/mcp-sap-datasphere-server/)
 [![Python](https://img.shields.io/pypi/pyversions/mcp-sap-datasphere-server)](https://pypi.org/project/mcp-sap-datasphere-server/)
 [![CI](https://github.com/rahulsethi/SAPDatasphereMCP/actions/workflows/ci.yml/badge.svg)](https://github.com/rahulsethi/SAPDatasphereMCP/actions/workflows/ci.yml)
@@ -204,7 +203,8 @@ Full changelog: [`CHANGELOG.md`](CHANGELOG.md).
 
 ## License
 
-**PolyForm Noncommercial 1.0.0** for v1.0+. Versions v0.3.1 and earlier remain MIT-licensed.
+**Business Source License 1.1** for v1.0+. Versions v0.3.1 and earlier remain MIT-licensed.
+Converts automatically to Apache 2.0 on 2029-01-01.
 
 - Personal, research, academic, and internal evaluation use: **free**.
 - Commercial use (paid consulting, embedding in a vendor product, hosted SaaS): **requires a separate commercial license**.
