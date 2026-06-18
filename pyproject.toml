@@ -7,7 +7,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "sap-datasphere-mcp"
+name = "mcp-sap-datasphere-server"
 version = "1.0.0"
 description = "Read-only SAP Datasphere MCP server — API Policy v4/2026 aligned, sibling to SAPBDCMCP."
 readme = "README.md"
@@ -50,6 +50,7 @@ Repository = "https://github.com/rahulsethi/SAPDatasphereMCP"
 Issues = "https://github.com/rahulsethi/SAPDatasphereMCP/issues"
 Family = "https://github.com/rahulsethi/SAPBDCMCP"
 "Changelog" = "https://github.com/rahulsethi/SAPDatasphereMCP/blob/main/CHANGELOG.md"
+"PyPI" = "https://pypi.org/project/mcp-sap-datasphere-server/"
 
 [project.scripts]
 sap-datasphere-mcp = "sap_datasphere_mcp.transports.stdio_server:main"

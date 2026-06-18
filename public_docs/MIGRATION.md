@@ -10,7 +10,7 @@ See also: [INSTALLATION.md](./INSTALLATION.md) · [TOOLS.md](./TOOLS.md) · [SAP
 
 ## 1. What changed at a glance
 
-- **PyPI package renamed** — `mcp-sap-datasphere-server` is gone; install `sap-datasphere-mcp` (matches the console script and the sibling `sap-bdc-mcp` package).
+- **PyPI package** — still `mcp-sap-datasphere-server`. Just upgrade in place: `pip install --upgrade mcp-sap-datasphere-server`.
 - **All 22 tools renamed** to a `datasphere_<category>_<verb>` shape; old names still work as aliases through 1.1 and are removed in 1.2 (~Q4 2026).
 - **License changed** — v1.0+ is **PolyForm Noncommercial 1.0.0**. v0.3.x and earlier stay MIT. Non-commercial use is unchanged; commercial use needs a separate license — see [COMMERCIAL_LICENSING.md](./COMMERCIAL_LICENSING.md).
 
@@ -18,24 +18,21 @@ See also: [INSTALLATION.md](./INSTALLATION.md) · [TOOLS.md](./TOOLS.md) · [SAP
 
 ## 2. Step-by-step migration
 
-### Step 1 — Uninstall the old package
+### Step 1 — Upgrade the package
+
+The PyPI package name is unchanged (`mcp-sap-datasphere-server`). Just upgrade:
 
 ```bash
-pip uninstall mcp-sap-datasphere-server
+pip install --upgrade mcp-sap-datasphere-server
 ```
 
-The old package name is permanently retired on PyPI. There is no upgrade-in-place path — the new distribution is a different project.
-
-### Step 2 — Install 1.0
-
-Pick whichever matches your environment:
+Or with uvx (zero-install, always gets latest):
 
 ```bash
-# PyPI (recommended for most users)
-pip install sap-datasphere-mcp
+uvx mcp-sap-datasphere-server
 
 # uvx (zero-install, run-on-demand)
-uvx sap-datasphere-mcp
+uvx mcp-sap-datasphere-server
 
 # npm (for hosts that prefer Node-style wiring)
 npx -y @rahulsethi/sap-datasphere-mcp

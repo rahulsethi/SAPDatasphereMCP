@@ -2,9 +2,10 @@
 
 > **v1.0.0** — Read-only. API Policy v4/2026 aligned. Sibling to [SAPBDCMCP](https://github.com/rahulsethi/SAPBDCMCP).
 
-[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)](LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/sap-datasphere-mcp)](https://pypi.org/project/sap-datasphere-mcp/)
-[![Python](https://img.shields.io/pypi/pyversions/sap-datasphere-mcp)](https://pypi.org/project/sap-datasphere-mcp/)
+[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyFor
+m%20Noncommercial%201.0.0-blue)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/mcp-sap-datasphere-server)](https://pypi.org/project/mcp-sap-datasphere-server/)
+[![Python](https://img.shields.io/pypi/pyversions/mcp-sap-datasphere-server)](https://pypi.org/project/mcp-sap-datasphere-server/)
 [![CI](https://github.com/rahulsethi/SAPDatasphereMCP/actions/workflows/ci.yml/badge.svg)](https://github.com/rahulsethi/SAPDatasphereMCP/actions/workflows/ci.yml)
 
 An open-source [Model Context Protocol](https://modelcontextprotocol.io/) server that lets AI agents — Claude, Cursor, or any MCP-compatible client — safely explore an **SAP Datasphere** tenant. Discover spaces, list assets, preview rows, profile columns, search by column name, and summarize analytical models — all through a clean, read-only tool surface that respects SAP's API governance posture.
@@ -39,14 +40,16 @@ sap-datasphere-mcp  ──>  FastMCP server  ──>  tools/registry  ──>  c
 
 ```bash
 # uv / uvx — fastest, no global install
-uvx sap-datasphere-mcp
+uvx mcp-sap-datasphere-server
 
 # pip / pipx
-pip install sap-datasphere-mcp        # or:  pipx install sap-datasphere-mcp
+pip install mcp-sap-datasphere-server        # or:  pipx install mcp-sap-datasphere-server
 
 # npm (npx-wrapper bootstraps the Python package via uvx)
 npx -y @rahulsethi/sap-datasphere-mcp
 ```
+
+> The **console script** is still `sap-datasphere-mcp` — that's what you run, wire into Claude Desktop, and put in MCP host configs. The PyPI *package name* is `mcp-sap-datasphere-server`.
 
 Full install guide and Claude Desktop / Cursor wiring is in [`public_docs/INSTALLATION.md`](public_docs/INSTALLATION.md).
 

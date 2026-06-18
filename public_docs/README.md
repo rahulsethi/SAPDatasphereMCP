@@ -60,7 +60,7 @@ SAP Datasphere MCP Server has a sibling: **[SAPBDCMCP](https://github.com/rahuls
 
 - **Version:** 1.0.0
 - **Python:** 3.11+
-- **Distribution:** PyPI `sap-datasphere-mcp`, npm `@rahulsethi/sap-datasphere-mcp`, uvx `uvx sap-datasphere-mcp`
+- **Distribution:** PyPI `mcp-sap-datasphere-server`, npm `@rahulsethi/sap-datasphere-mcp`, uvx `uvx mcp-sap-datasphere-server`
 - **Console script:** `sap-datasphere-mcp`
 
 ---

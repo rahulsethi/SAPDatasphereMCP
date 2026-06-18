@@ -9,7 +9,7 @@ Three ways to install. Pick the one that matches your stack.
 The fastest way to try the server. `uvx` runs it in an isolated environment, no pip install required.
 
 ```bash
-uvx sap-datasphere-mcp
+uvx mcp-sap-datasphere-server
 ```
 
 What you get: the latest published version, installed on demand, with no impact on your global Python. Re-run the same command later and you get the latest release.
@@ -19,7 +19,7 @@ What you get: the latest published version, installed on demand, with no impact 
 If you want the server installed into a Python environment you control:
 
 ```bash
-pip install sap-datasphere-mcp
+pip install mcp-sap-datasphere-server
 ```
 
 What you get: the `sap-datasphere-mcp` console script on your PATH and the package importable for scripting.
@@ -128,7 +128,7 @@ Open Claude Desktop's `claude_desktop_config.json` (Settings → Developer → E
   "mcpServers": {
     "sap-datasphere": {
       "command": "uvx",
-      "args": ["sap-datasphere-mcp"],
+      "args": ["mcp-sap-datasphere-server"],
       "env": {
         "DATASPHERE_TENANT_URL": "https://my-tenant.eu10.hcs.cloud.sap",
         "DATASPHERE_OAUTH_TOKEN_URL": "https://my-tenant.authentication.eu10.hana.ondemand.com/oauth/token",
@@ -153,7 +153,7 @@ Create or edit `.cursor/mcp.json` in your project:
   "mcpServers": {
     "sap-datasphere": {
       "command": "uvx",
-      "args": ["sap-datasphere-mcp"],
+      "args": ["mcp-sap-datasphere-server"],
       "env": {
         "DATASPHERE_TENANT_URL": "https://my-tenant.eu10.hcs.cloud.sap",
         "DATASPHERE_OAUTH_TOKEN_URL": "https://my-tenant.authentication.eu10.hana.ondemand.com/oauth/token",
