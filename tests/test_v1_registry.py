@@ -12,7 +12,6 @@ from typing import Any, Dict, List, Tuple
 import pytest
 
 from sap_datasphere_mcp import policy, redaction
-from sap_datasphere_mcp.audit import AuditLog
 from sap_datasphere_mcp.tools import _aliases, _metadata
 from sap_datasphere_mcp.tools.governance import api_policy_check, audit_tail
 
@@ -197,7 +196,6 @@ def test_policy_gate_strict_allows_permitted_tools():
 
 def test_alias_logs_deprecation_warning_once(caplog):
     """An alias call logs a single deprecation warning the first time it's used."""
-    import asyncio
     from sap_datasphere_mcp.tools import _gated, _metadata
 
     meta = _metadata.TOOL_REGISTRY["datasphere_connectivity_ping"]

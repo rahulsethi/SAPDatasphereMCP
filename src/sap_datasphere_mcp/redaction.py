@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 __all__ = ["DEFAULT_PATTERNS", "scrub", "is_enabled"]
 

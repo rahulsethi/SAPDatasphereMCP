@@ -29,12 +29,10 @@ pip install --upgrade mcp-sap-datasphere-server
 Or with uvx (zero-install, always gets latest):
 
 ```bash
+# uvx
 uvx mcp-sap-datasphere-server
 
-# uvx (zero-install, run-on-demand)
-uvx mcp-sap-datasphere-server
-
-# npm (for hosts that prefer Node-style wiring)
+# npm
 npx -y @rahulsethi/sap-datasphere-mcp
 ```
 

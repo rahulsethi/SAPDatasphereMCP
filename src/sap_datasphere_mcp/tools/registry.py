@@ -15,7 +15,7 @@ back-compat (it delegates here under the hood, see :mod:`.tasks`).
 from __future__ import annotations
 
 import logging
-from typing import Any, Iterable, List, Tuple
+from typing import Any, Iterable, Tuple
 
 from . import _aliases, _gated, catalog, connectivity, discover, governance, profile, query, summarize
 from ._metadata import ToolMetadata

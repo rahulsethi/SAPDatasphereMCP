@@ -116,7 +116,6 @@ def wrap_tool(meta: ToolMetadata, fn: Callable[..., Awaitable[Any]]) -> Callable
 
 def make_alias(legacy_name: str, target_meta: ToolMetadata, wrapped_target: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
     """Return an async alias wrapper that logs a one-time deprecation warning."""
-    sig = inspect.signature(wrapped_target)
     _logged = {"once": False}
 
     @functools.wraps(wrapped_target)

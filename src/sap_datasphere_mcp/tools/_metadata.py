@@ -14,7 +14,7 @@ Drives:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, Iterator, List, Optional, Tuple
 
 __all__ = ["ToolMetadata", "TOOL_REGISTRY", "iter_tools", "by_legacy_name"]

@@ -20,7 +20,6 @@ factory so they boot identically.
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 __all__ = ["create_server"]

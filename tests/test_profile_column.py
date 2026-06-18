@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict, List
 
 from sap_datasphere_mcp.models import QueryResult
 from sap_datasphere_mcp.tools import tasks
