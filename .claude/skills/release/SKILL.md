@@ -29,6 +29,7 @@ The version is the single source of truth in `pyproject.toml` but is echoed in
    match the new version. Only touch version-related lines (surgical changes).
 
 6. **Verify before committing.**
+
    ```powershell
    ruff check . ; ruff format .
    pytest -q
