@@ -5,6 +5,14 @@
 
 # Deferred — v1.0
 
+> ⚠️ **As-shipped reconciliation — added 2026-07-01 (post-dates this doc).** Where this doc disagrees with the shipped code / root `LICENSE` / `CHANGELOG.md`, **the code is authoritative**:
+>
+> - **License:** shipped as **Business Source License 1.1 (BSL 1.1)** → Apache 2.0 on 2029-01-01, **not** PolyForm Noncommercial.
+> - **PyPI name:** kept as **`mcp-sap-datasphere-server`** (rename reverted); a `mcp-sap-datasphere-server` console-script alias was added. DEF-020/DEF-023 gates apply to `mcp-sap-datasphere-server`, not `sap-datasphere-mcp`.
+> - **mTLS (DEF pre-release gate):** the `DATASPHERE_OAUTH_MTLS_CERT`/`_KEY` binding is **not yet implemented** in `auth.py` — the "mTLS end-to-end" gate is a roadmap item, not a v1.0 verification.
+>
+> Corrected as-shipped docs live in root `CHANGELOG.md`, `LICENSE`, and `public_docs/`.
+
 The single, canonical list of work that v1.0 explicitly does **not** ship,
 the target release for each item, and *why* it was deferred. Cross-linked
 from `ProjectPlan_v1.0.md §2.2`, `Decisions_v1.0.md` (relevant ADRs), and

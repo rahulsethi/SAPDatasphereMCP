@@ -1,5 +1,13 @@
 # SAP Datasphere MCP Server — v1.0 Architecture Decisions
 
+> ⚠️ **As-shipped reconciliation — added 2026-07-01 (post-dates these ADRs).** Two decisions below were amended/reversed during execution (see the per-ADR notes on ADR-002 and ADR-006). Where this document disagrees with the shipped code / root `LICENSE` / `CHANGELOG.md`, **the code is authoritative**:
+>
+> - **License (ADR-002):** shipped under the **Business Source License 1.1 (BSL 1.1)**, converting to Apache 2.0 on 2029-01-01 — **not** PolyForm Noncommercial. Same noncommercial-free / commercial-paid intent.
+> - **PyPI distribution name (ADR-006):** rename **reverted** — kept as **`mcp-sap-datasphere-server`** (the short name is an unrelated community package). A `mcp-sap-datasphere-server` console-script alias was added; install with **`uvx mcp-sap-datasphere-server`**.
+> - **mTLS (Tier C):** documented posture only — the `DATASPHERE_OAUTH_MTLS_CERT`/`_KEY` binding is **not yet implemented** in `auth.py` (roadmap).
+>
+> ADRs are historical records and are preserved as-written; the notes reconcile them with what shipped.
+
 This document records the discrete architectural and product decisions taken for
 the v1.0 release. It complements `ProjectPlan_v1.0.md`, which describes the
 release holistically; this file captures the rationale and rejected alternatives
@@ -66,7 +74,9 @@ first-time release at this name; implies a 1.x that never existed.
 
 ## ADR-002: Relicense from MIT to PolyForm Noncommercial 1.0.0
 
-**Status:** Accepted
+> **Amended in execution (2026-07-01):** shipped under the **Business Source License 1.1 (BSL 1.1)**, *not* PolyForm Noncommercial. BSL 1.1 delivers the same noncommercial-free / commercial-paid split (via its Additional Use Grant) and additionally converts to Apache 2.0 on 2029-01-01. The MIT→noncommercial *intent* recorded below holds; only the specific license changed. Ground truth: root `LICENSE`.
+
+**Status:** Accepted — *license choice amended in execution (see note above)*
 
 **Date:** 2026-05-30
 
@@ -266,7 +276,9 @@ wasted-request tax.
 
 ## ADR-006: Rename the PyPI distribution to `sap-datasphere-mcp`
 
-**Status:** Accepted
+> **Reverted in execution (2026-07-01):** the rename did **not** ship. `sap-datasphere-mcp` is taken on PyPI by an unrelated community package, so the distribution **stayed `mcp-sap-datasphere-server`**. Instead, a `mcp-sap-datasphere-server` console-script alias was added so `uvx mcp-sap-datasphere-server` resolves the server. The `pip uninstall/install sap-datasphere-mcp` commands below are obsolete — upgrade in place with `pip install --upgrade mcp-sap-datasphere-server`.
+
+**Status:** Reverted — *not shipped (see note above)*
 
 **Date:** 2026-05-30
 

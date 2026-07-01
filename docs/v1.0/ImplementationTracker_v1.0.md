@@ -5,6 +5,14 @@
 
 # Implementation Tracker — v1.0
 
+> ⚠️ **As-shipped reconciliation — added 2026-07-01 (post-dates this doc).** Where this tracker disagrees with the shipped code / root `LICENSE` / `CHANGELOG.md`, **the code is authoritative**:
+>
+> - **A5 / K1 (License):** shipped as **Business Source License 1.1 (BSL 1.1)** → Apache 2.0 on 2029-01-01, **not** PolyForm Noncommercial.
+> - **A1 (PyPI name):** rename **reverted** — distribution kept as **`mcp-sap-datasphere-server`**; a `mcp-sap-datasphere-server` console-script alias was added (`uvx mcp-sap-datasphere-server`). Ignore `sap-datasphere-mcp` as a package/install target below.
+> - **mTLS:** `DATASPHERE_OAUTH_MTLS_CERT`/`_KEY` are documented posture only — **not yet wired into `auth.py`** (roadmap).
+>
+> Corrected as-shipped docs live in root `CHANGELOG.md`, `LICENSE`, and `public_docs/`.
+
 Companion to `ProjectPlan_v1.0.md` (the *what & why*) and `Decisions_v1.0.md`
 (the *because*). This tracker is the *did we do it*. Each row maps to a
 concrete unit of work with status and verification notes.

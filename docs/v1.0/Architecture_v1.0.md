@@ -7,6 +7,14 @@
 
 # SAP Datasphere MCP Server — v1.0 Architecture
 
+> ⚠️ **As-shipped reconciliation — added 2026-07-01 (post-dates this design doc).** Several v1.0 decisions changed during execution. Where this document disagrees with the shipped code / root `LICENSE` / `CHANGELOG.md`, **the code is authoritative**:
+>
+> - **License:** shipped under the **Business Source License 1.1 (BSL 1.1)**, which converts to Apache 2.0 on 2029-01-01 — **not** PolyForm Noncommercial. The noncommercial-free / commercial-paid *intent* is unchanged.
+> - **PyPI distribution name:** kept as **`mcp-sap-datasphere-server`** — the planned rename to `sap-datasphere-mcp` was reverted (that short name is an unrelated community package). A `mcp-sap-datasphere-server` console-script alias was added, so install with **`uvx mcp-sap-datasphere-server`** / **`pip install mcp-sap-datasphere-server`**. Any `pip install`/`uvx`/`pipx sap-datasphere-mcp` command below is obsolete — `sap-datasphere-mcp` is only the console-script/command name.
+> - **mTLS (Tier C):** documented posture only — `DATASPHERE_OAUTH_MTLS_CERT`/`_KEY` are **not yet wired into the OAuth token flow** in `auth.py` (roadmap, not implemented).
+>
+> Corrected as-shipped docs live in root `CHANGELOG.md`, `LICENSE`, and `public_docs/`.
+
 This document describes **how** the v1.0 server is put together. For **what** the
 release contains and **why** the design choices were made, see the companion
 [`ProjectPlan_v1.0.md`](./ProjectPlan_v1.0.md). Where the project plan answers
