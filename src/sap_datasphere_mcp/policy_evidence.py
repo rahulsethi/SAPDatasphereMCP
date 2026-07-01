@@ -1,6 +1,6 @@
 # SAP Datasphere MCP Server
 # File: policy_evidence.py
-# Version: v1 (1.0)
+# Version: v2 (1.0)
 
 """Static disclosure data about the SAP API Policy v4/2026 posture.
 
@@ -77,9 +77,9 @@ EVIDENCE: Dict[str, Any] = {
             "verified_by": "policy.py:permits().",
         },
         {
-            "id": "mtls-supported",
-            "claim": "mTLS-bound client_credentials supported via DATASPHERE_OAUTH_MTLS_CERT / _KEY.",
-            "verified_by": "auth.OAuthClient — see Architecture_v1.0.md §10.",
+            "id": "mtls-tier-c",
+            "claim": "mTLS-bound client_credentials (Tier C) is a documented deployment posture. DATASPHERE_OAUTH_MTLS_CERT / _KEY are recognized and reported here, but binding them into the OAuth token flow is on the roadmap and not yet implemented in auth.OAuthClient.",
+            "verified_by": "public_docs/SAP_API_POLICY.md Tier C (roadmap; not yet wired into auth.py).",
         },
         {
             "id": "deployment-recommendation",

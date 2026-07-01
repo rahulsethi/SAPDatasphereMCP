@@ -1,6 +1,6 @@
 # SAP Datasphere MCP Server
 # File: pyproject.toml
-# Version: v3 (1.0)
+# Version: v4 (1.0)
 
 [build-system]
 requires = ["hatchling"]
@@ -54,6 +54,11 @@ Family = "https://github.com/rahulsethi/SAPBDCMCP"
 
 [project.scripts]
 sap-datasphere-mcp = "sap_datasphere_mcp.transports.stdio_server:main"
+# Distribution-name alias so `uvx mcp-sap-datasphere-server` and
+# `pipx run mcp-sap-datasphere-server` resolve the console script (the PyPI
+# distribution is `mcp-sap-datasphere-server`; `sap-datasphere-mcp` alone is an
+# unrelated community package). Both entry points invoke the same main().
+mcp-sap-datasphere-server = "sap_datasphere_mcp.transports.stdio_server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/sap_datasphere_mcp"]

@@ -1,6 +1,6 @@
 # Migrating from v0.3.x to v1.0
 
-SAP Datasphere MCP Server **1.0.0** ships on **2026-05-30** and consolidates three breaking changes — a distribution rename, a tool-naming overhaul, and a license change — into a single, coherent release. This guide walks you from any v0.3.x install to v1.0 in five steps or less.
+SAP Datasphere MCP Server **1.0.0** ships on **2026-05-30** and consolidates several breaking changes — a tool-naming overhaul, a license change, a Python-floor bump, and an API-path migration — into a single, coherent release. (The PyPI distribution name is **unchanged** — a planned rename was reverted.) This guide walks you from any v0.3.x install to v1.0 in five steps or less.
 
 > If you are still on v0.3.1 or earlier today, you have until at least **1.2 (~Q4 2026)** before legacy tool names stop resolving, and until **March 2027** before the legacy `/api/v1/dwc/*` API path tree disappears. There is no rush — but the longer you wait, the more compounds.
 
@@ -12,7 +12,7 @@ See also: [INSTALLATION.md](./INSTALLATION.md) · [TOOLS.md](./TOOLS.md) · [SAP
 
 - **PyPI package** — still `mcp-sap-datasphere-server`. Just upgrade in place: `pip install --upgrade mcp-sap-datasphere-server`.
 - **All 22 tools renamed** to a `datasphere_<category>_<verb>` shape; old names still work as aliases through 1.1 and are removed in 1.2 (~Q4 2026).
-- **License changed** — v1.0+ is **PolyForm Noncommercial 1.0.0**. v0.3.x and earlier stay MIT. Non-commercial use is unchanged; commercial use needs a separate license — see [COMMERCIAL_LICENSING.md](./COMMERCIAL_LICENSING.md).
+- **License changed** — v1.0+ is the **Business Source License 1.1 (BSL 1.1)** (converts to Apache 2.0 on 2029-01-01). v0.3.x and earlier stay MIT. Non-commercial use is unchanged; commercial use needs a separate license — see [COMMERCIAL_LICENSING.md](./COMMERCIAL_LICENSING.md).
 
 ---
 
@@ -49,8 +49,8 @@ v1.0 raises the Python floor from 3.10 to 3.11 to match the sibling repo and unl
 
 ### Step 4 — Acknowledge the license change
 
-- **Community, research, and personal use** are unchanged — PolyForm Noncommercial 1.0.0 is at least as permissive as MIT for those audiences. Just install and use it.
-- **Internal enterprise evaluation / POC** is also fine under PolyForm — it explicitly permits non-commercial use, including pre-purchase evaluation at companies.
+- **Community, research, and personal use** are unchanged — the BSL 1.1 Additional Use Grant is at least as permissive as MIT for those audiences. Just install and use it.
+- **Internal enterprise evaluation / POC** is also fine under BSL 1.1 — the Additional Use Grant explicitly permits non-commercial and internal-evaluation use at companies.
 - **Commercial deployment** (paid consulting using the server, embedding it in a vendor product, or running it as part of a paid managed service) requires a commercial license. Path is short and friendly: see [COMMERCIAL_LICENSING.md](./COMMERCIAL_LICENSING.md).
 
 ### Step 5 — Update your Claude Desktop config
@@ -62,7 +62,7 @@ The `command` field does **not** change — the console script is still `sap-dat
   "mcpServers": {
     "sap-datasphere": {
       "command": "uvx",
-      "args": ["sap-datasphere-mcp"],
+      "args": ["mcp-sap-datasphere-server"],
       "env": {
         "DATASPHERE_TENANT_URL": "https://<your-tenant>.eu10.hcs.cloud.sap",
         "DATASPHERE_OAUTH_CLIENT_ID": "sb-...",
@@ -126,8 +126,8 @@ All new env vars are **optional** and default to **off**. v1.0 does not require 
 | `DATASPHERE_AUDIT_LOG_PATH` | Override the audit log path. | `~/.cache/sap-datasphere-mcp/audit.log` |
 | `DATASPHERE_API_POLICY_STRICT` | Refuse any tool flagged as `policy_class=gated`. No-op at 1.0 (no gated tools); reserved for future tools. | `0` |
 | `DATASPHERE_REDACTION_ENABLED` | Scrub secrets, tokens, and JWTs from tool returns before serialization. **Recommended on.** | `1` |
-| `DATASPHERE_OAUTH_MTLS_CERT` | Path to a client certificate for mTLS-bound `client_credentials` via SAP IAS (RFC 8705). | unset |
-| `DATASPHERE_OAUTH_MTLS_KEY` | Path to the matching private key. Both `_CERT` and `_KEY` must be set together. | unset |
+| `DATASPHERE_OAUTH_MTLS_CERT` | Client certificate for mTLS-bound `client_credentials` via SAP IAS (RFC 8705). *Recognized for posture reporting; token-flow binding is on the roadmap, not yet implemented.* | unset |
+| `DATASPHERE_OAUTH_MTLS_KEY` | Matching private key. Both `_CERT` and `_KEY` must be set together. *(Roadmap — see `_CERT`.)* | unset |
 | `DATASPHERE_MCP_BEARER_TOKEN` | Required bearer token when running with the optional HTTP transport. Not used by the default stdio transport. | unset |
 | `DATASPHERE_RESOURCE_SAMPLE_ROWS` | Row cap for the `datasphere://...asset/{name}/sample` MCP Resource. | `5` |
 
@@ -174,8 +174,8 @@ v1.0 is not just a rename — it adds first-in-class capabilities that no other 
 - **Four MCP Resources** — URI-addressable catalog content under `datasphere://space/{id}/...`. Hosts that support MCP Resources can pre-load tenant context without ever calling a tool.
 - **Two new governance tools** — `datasphere_governance_api_policy_check` (reports the current deployment posture, audit/redaction/mTLS status, and tool policy classification) and `datasphere_governance_audit_tail` (returns the last N audit log lines when audit is enabled).
 - **MCP tool annotations** — every tool is now tagged `readOnlyHint=true`, `destructiveHint=false`. Claude Desktop and other hosts can skip confirmation prompts on tools that cannot mutate your tenant.
-- **`outputSchema` + structured content** — every tool that returns structured data declares a JSON Schema, so your agent can reason over typed output instead of free-text scraping.
-- **Cursor-based pagination** — `datasphere_catalog_list_spaces`, `datasphere_catalog_list_assets`, and the `datasphere_discover_*` family accept opaque cursors for large tenants.
+- **`outputSchema` + structured content** *(rolling out in 1.0.x)* — per-tool JSON Schemas are being added incrementally so agents can reason over typed output instead of free-text scraping.
+- **Pagination** — the `datasphere_catalog_list_*` and `datasphere_discover_*` tools accept OData-native `top` / `skip` today; opaque cursor-based pagination is planned for 1.0.x.
 
 The sibling [SAPBDCMCP](https://github.com/rahulsethi/SAPBDCMCP) project ships under the same naming conventions, same license model, and same governance posture. If you operate across Datasphere and BDC, install both and use them side-by-side in the same Claude Desktop session — your agent will not have to context-switch.
 
@@ -185,9 +185,9 @@ The sibling [SAPBDCMCP](https://github.com/rahulsethi/SAPBDCMCP) project ships u
 
 | # | Change | Severity |
 |---|---|---|
-| B1 | PyPI package name `mcp-sap-datasphere-server` → `sap-datasphere-mcp` | **High** — every install command changes |
+| B1 | PyPI package name **unchanged** (`mcp-sap-datasphere-server`); a planned rename to `sap-datasphere-mcp` was reverted | **None** — upgrade in place |
 | B2 | All 22 tool names changed (aliases through 1.1, removed in 1.2) | **Medium** — aliases buy time; act before Q4 2026 |
-| B3 | License MIT → PolyForm Noncommercial 1.0.0 (v1.0+ only; v0.3.x stays MIT) | **Medium for commercial users**, **none for everyone else** |
+| B3 | License MIT → BSL 1.1 (v1.0+ only; v0.3.x stays MIT; converts to Apache 2.0 on 2029-01-01) | **Medium for commercial users**, **none for everyone else** |
 | B4 | Python floor 3.10 → 3.11 | **Low** — 3.11 has been GA since late 2022 |
 | B5 | Default API path `/api/v1/dwc/*` → `/api/v1/datasphere/*` (legacy escape hatch available) | **Low** — auto-fallback via env var |
 | B6 | Internal entry `tools.tasks.register_tools` removed; replaced by `tools.registry.register_all` | **Low** — only affects code importing internal APIs (none expected externally) |
@@ -200,7 +200,7 @@ The sibling [SAPBDCMCP](https://github.com/rahulsethi/SAPBDCMCP) project ships u
 You uninstalled the old package but did not install the new one, or installed it into a different virtualenv. Run:
 
 ```bash
-pip install sap-datasphere-mcp
+pip install mcp-sap-datasphere-server
 python -c "import sap_datasphere_mcp; print(sap_datasphere_mcp.__version__)"
 ```
 

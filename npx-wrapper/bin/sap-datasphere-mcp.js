@@ -10,9 +10,9 @@
  * doesn't even know there was a Node layer in the middle.
  *
  * Preference order:
- *   1. `uvx sap-datasphere-mcp`           (uv — fastest, no global install)
- *   2. `pipx run sap-datasphere-mcp`      (pipx)
- *   3. `python -m sap_datasphere_mcp`     (already on PATH)
+ *   1. `uvx mcp-sap-datasphere-server`       (uv — fastest, no global install)
+ *   2. `pipx run mcp-sap-datasphere-server`  (pipx)
+ *   3. `python -m sap_datasphere_mcp`        (already on PATH)
  *
  * If none of these are available we print a clear, actionable message and
  * exit non-zero — never silently fall through.
@@ -24,7 +24,7 @@ const { spawn } = require('node:child_process');
 const { existsSync } = require('node:fs');
 const path = require('node:path');
 
-const PACKAGE_NAME = 'sap-datasphere-mcp';
+const PACKAGE_NAME = 'mcp-sap-datasphere-server';
 const VERSION = '1.0.0';
 
 const args = process.argv.slice(2);

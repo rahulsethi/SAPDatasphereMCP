@@ -74,7 +74,7 @@ Recommended for: personal exploration, single-developer use against your own org
 
 ### Tier C (hardening) — mTLS-bound client_credentials via IAS
 
-For Tier B deployments that want stronger client authentication, enable **mTLS-bound client_credentials** via SAP IAS (RFC 8705). Set:
+For Tier B deployments that want stronger client authentication, the roadmap adds **mTLS-bound client_credentials** via SAP IAS (RFC 8705), configured with:
 
 ```bash
 DATASPHERE_OAUTH_MTLS_CERT=/path/to/client.crt
@@ -83,7 +83,9 @@ DATASPHERE_OAUTH_MTLS_KEY=/path/to/client.key
 
 This replaces the OAuth `client_secret` with a certificate, eliminating shared-secret rotation as a failure mode and giving the IdP cryptographic proof of which client is connecting. See the SAP Community post [Realize client_credentials flow with IAS mTLS](https://community.sap.com/t5/technology-blog-posts-by-sap/sap-btp-security-how-to-realize-client-credentials-flow-with-it-2-mtls/ba-p/13564508).
 
-Recommended for: any production-grade Tier B that cannot move to Tier A yet, and as defense-in-depth on top of Tier A.
+> **Status: roadmap, not yet implemented.** `DATASPHERE_OAUTH_MTLS_CERT` / `_KEY` are recognized and reported by `datasphere_governance_api_policy_check` for posture disclosure, but the certificate binding is **not yet wired into the OAuth token flow** in `auth.py`. Do not rely on Tier C for enforcement today — use Tier A (MCP Gateway) or rotate the `client_secret` (Tier B) until it lands.
+
+Recommended for (once implemented): any production-grade Tier B that cannot move to Tier A yet, and as defense-in-depth on top of Tier A.
 
 ---
 
@@ -107,7 +109,7 @@ If you are deploying this server in any environment more sensitive than your lap
 
 1. **Audit the deployment against your own org's policy.** This document is best-effort transparency, not legal sign-off. Your org's procurement, security, and SAP-licensing teams have the final word.
 2. **Consider the Integration Suite MCP Gateway** (Tier A) for production. It is the single biggest reduction in compliance risk available to you and SAP itself is steering customers there.
-3. **Rotate OAuth `client_secret` values quarterly** at minimum. Move to **mTLS-bound client_credentials** (Tier C) when your IdP supports it — IAS does.
+3. **Rotate OAuth `client_secret` values quarterly** at minimum. mTLS-bound client_credentials (Tier C) is on the roadmap (see the Tier C note above); until it lands, `client_secret` rotation is your Tier B control.
 4. **Enable audit logging** — `DATASPHERE_AUDIT_ENABLED=1`. Reviewing the audit tail periodically is the simplest evidence-of-control your security team can ask for.
 5. **Set `DATASPHERE_API_POLICY_STRICT=1`** as a defense-in-depth flag. It costs nothing today and protects you from future tool additions that might touch sensitive surfaces.
 6. **Restrict outbound network access** from the MCP server host to only your Datasphere tenant and IdP. The server has no other legitimate destinations.

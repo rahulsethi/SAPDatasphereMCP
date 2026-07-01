@@ -1,6 +1,6 @@
 # Commercial Licensing
 
-SAP Datasphere MCP Server is free for personal, research, and non-commercial use under the **PolyForm Noncommercial 1.0.0** license. Commercial use requires a separate, friendly, low-friction commercial license. This document explains the boundary, what counts as which, and how to obtain a commercial license without a lawyer call.
+SAP Datasphere MCP Server is free for personal, research, and non-commercial use under the **Business Source License 1.1 (BSL 1.1)**. Commercial use requires a separate, friendly, low-friction commercial license. This document explains the boundary, what counts as which, and how to obtain a commercial license without a lawyer call.
 
 See also: [MIGRATION.md](./MIGRATION.md) · [SAP_API_POLICY.md](./SAP_API_POLICY.md)
 
@@ -8,11 +8,11 @@ See also: [MIGRATION.md](./MIGRATION.md) · [SAP_API_POLICY.md](./SAP_API_POLICY
 
 ## 1. Default license
 
-v1.0 and onward ship under the **[PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/)** license.
+v1.0 and onward ship under the **[Business Source License 1.1](https://mariadb.com/bsl11/)** (BSL 1.1), with a **Change Date of 2029-01-01** on which each covered version converts automatically to the **Apache License 2.0**.
 
-PolyForm Noncommercial is a modern, short, plain-English source-available license that grants broad rights for **personal use, research, evaluation, and any non-commercial deployment**. You can read, modify, redistribute, and run the code — including inside companies — as long as the use itself is not commercial. The license is widely used by mature open-source projects with a paid commercial tier (e.g., Sentry's BSL-derived stack, several developer-tools companies); it is not a homegrown license.
+BSL 1.1 is a source-available license used by mature projects with a paid commercial tier (MariaDB, Sentry, CockroachDB). Under the **Additional Use Grant** in our `LICENSE`, you can read, modify, redistribute, and run the code — including inside companies — for **personal use, research, academic use, and internal evaluation**; only a *Commercial Purpose* requires a separate license. Because it is BSL and not a perpetual restriction, every version additionally becomes Apache 2.0 open source on the Change Date — it is a time-limited commercial grant, not indefinite lock-up.
 
-**What PolyForm Noncommercial allows:**
+**What the license allows (free, under the Additional Use Grant):**
 
 - Personal use on your own machine.
 - Academic research, coursework, and teaching.
@@ -21,7 +21,7 @@ PolyForm Noncommercial is a modern, short, plain-English source-available licens
 - Community contributions and forks.
 - Embedding inside other non-commercial projects.
 
-**What PolyForm Noncommercial does not allow:**
+**What the license does not allow without a commercial license (Commercial Purpose):**
 
 - Using the server commercially in a paying engagement.
 - Embedding the server inside a commercial product you ship or license to customers.
@@ -104,7 +104,7 @@ We prefer simplicity. If you tell us your use case, you will get a single number
 
 ## 6. Pre-1.0 versions
 
-**v0.3.1 and all earlier releases are MIT-licensed and unaffected by this change.** The PolyForm Noncommercial 1.0.0 license governs only the **v1.0 and later** codebase. Commercial users currently on v0.3.x are not retroactively required to obtain a commercial license — your MIT-licensed copy remains MIT-licensed.
+**v0.3.1 and all earlier releases are MIT-licensed and unaffected by this change.** The Business Source License 1.1 governs only the **v1.0 and later** codebase (converting to Apache 2.0 on 2029-01-01). Commercial users currently on v0.3.x are not retroactively required to obtain a commercial license — your MIT-licensed copy remains MIT-licensed.
 
 That said, we strongly recommend upgrading:
 
@@ -126,7 +126,7 @@ If your use case spans both Datasphere and BDC — which is increasingly common,
 
 ## 8. Open source contributions
 
-**Contributing code to this project does not require a commercial license.** We welcome community pull requests under the PolyForm Noncommercial license. There is **no Contributor License Agreement (CLA)** at v1.0 — contributors retain copyright over their own contributions and license them inbound under PolyForm Noncommercial.
+**Contributing code to this project does not require a commercial license.** We welcome community pull requests under the BSL 1.1 license. There is **no Contributor License Agreement (CLA)** at v1.0 — contributors retain copyright over their own contributions and license them inbound under BSL 1.1.
 
 If you are unsure whether a contribution would be welcome before investing time, open a GitHub Discussion first — we are happy to talk through proposed changes early.
 

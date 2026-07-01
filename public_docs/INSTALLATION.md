@@ -171,7 +171,7 @@ Reload Cursor. The server appears under the MCP panel.
 
 ## Wire to other MCP hosts
 
-The server speaks the standard MCP stdio transport, so any compliant host can launch it the same way: a `command` (e.g. `uvx`), `args` (`["sap-datasphere-mcp"]`), and an `env` block with your credentials. Check your host's MCP documentation for the exact config file location.
+The server speaks the standard MCP stdio transport, so any compliant host can launch it the same way: a `command` (e.g. `uvx`), `args` (`["mcp-sap-datasphere-server"]`), and an `env` block with your credentials. Check your host's MCP documentation for the exact config file location.
 
 ---
 

@@ -64,9 +64,9 @@ jobs:
             ## Installation
 
             ```bash
-            pip install sap-datasphere-mcp==${{ github.ref_name }}
+            pip install mcp-sap-datasphere-server==${{ github.ref_name }}
             # or
-            uvx sap-datasphere-mcp
+            uvx mcp-sap-datasphere-server
             ```
 
             See [CHANGELOG.md](https://github.com/rahulsethi/SAPDatasphereMCP/blob/main/CHANGELOG.md) for full release notes.

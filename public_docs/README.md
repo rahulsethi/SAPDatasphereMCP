@@ -67,4 +67,4 @@ SAP Datasphere MCP Server has a sibling: **[SAPBDCMCP](https://github.com/rahuls
 
 ## License
 
-Distributed under the **PolyForm Noncommercial 1.0.0** license — free for personal, community, research, and evaluation use. Commercial use (using this inside a paid engagement, a commercial product, or a revenue-generating workflow) requires a separate commercial license. The path is friendly and the terms are reasonable — see [COMMERCIAL_LICENSING.md](./COMMERCIAL_LICENSING.md).
+Distributed under the **Business Source License 1.1 (BSL 1.1)** (converts to Apache 2.0 on 2029-01-01) — free for personal, community, research, and evaluation use. Commercial use (using this inside a paid engagement, a commercial product, or a revenue-generating workflow) requires a separate commercial license. The path is friendly and the terms are reasonable — see [COMMERCIAL_LICENSING.md](./COMMERCIAL_LICENSING.md).

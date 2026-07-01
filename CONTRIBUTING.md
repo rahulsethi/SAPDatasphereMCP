@@ -52,7 +52,7 @@ See the architecture diagram in [README.md](README.md) for the high-level pictur
 
 ## License
 
-Contributions are accepted under the **PolyForm Noncommercial 1.0.0** license
+Contributions are accepted under the **Business Source License 1.1 (BSL 1.1)** license
 (applies to v1.0+). No CLA required; contributors retain copyright. See
 [`COMMERCIAL_LICENSING.md`](COMMERCIAL_LICENSING.md) for how the dual model
 works.

@@ -30,7 +30,7 @@ sap-datasphere-mcp  ──>  FastMCP server  ──>  tools/registry  ──>  c
 - **SAP API Policy v4/2026 aligned** — documented posture, optional audit log, redaction layer, Integration Suite **MCP Gateway** as the recommended enterprise deployment path.
 - **Sibling to [SAPBDCMCP](https://github.com/rahulsethi/SAPBDCMCP)** — same maintainer, same naming, same license model. Run them side-by-side in the same MCP host.
 - **No write tools, ever.** Hard guarantee for the 1.x line.
-- **OAuth 2.0 client_credentials** with optional **mTLS** via IAS.
+- **OAuth 2.0 client_credentials** (HTTP Basic, with body fallback). mTLS-bound client_credentials via IAS is a documented **Tier C** posture on the roadmap.
 - **stdio + streamable-HTTP** transports; optional bearer auth on HTTP.
 
 ---
@@ -72,7 +72,7 @@ Optional knobs you'll reach for most often:
 | `DATASPHERE_MOCK_MODE` | Run in-memory; no real tenant. | `0` |
 | `DATASPHERE_API_PATH_LEGACY` | Force legacy `/api/v1/dwc/*` first. | `0` |
 | `DATASPHERE_AUDIT_ENABLED` | Write a JSONL audit log per tool call. | `0` |
-| `DATASPHERE_OAUTH_MTLS_CERT` / `_KEY` | mTLS-bound client_credentials via IAS. | unset |
+| `DATASPHERE_OAUTH_MTLS_CERT` / `_KEY` | mTLS-bound client_credentials via IAS (Tier C). *Recognized and reported for posture; token-flow binding is on the roadmap, not yet wired in.* | unset |
 | `DATASPHERE_MCP_BEARER_TOKEN` | Bearer auth for the HTTP transport. | unset |
 
 Full env table: see [`public_docs/INSTALLATION.md`](public_docs/INSTALLATION.md).
@@ -177,11 +177,10 @@ A **2-for-1 family discount** is available on commercial licenses for both.
 In short:
 
 ```bash
-pip uninstall mcp-sap-datasphere-server
-pip install sap-datasphere-mcp
+pip install --upgrade mcp-sap-datasphere-server
 ```
 
-The 22 old tool names continue to work through v1.1 as deprecation aliases. Update your Claude Desktop / Cursor configs to the new `datasphere_<category>_<verb>` names before v1.2 (~Q4 2026). Full guide with the rename table: [`public_docs/MIGRATION.md`](public_docs/MIGRATION.md).
+The PyPI distribution name is unchanged (`mcp-sap-datasphere-server`) — upgrade in place. The 22 old tool names continue to work through v1.1 as deprecation aliases. Update your Claude Desktop / Cursor configs to the new `datasphere_<category>_<verb>` names before v1.2 (~Q4 2026). Full guide with the rename table: [`public_docs/MIGRATION.md`](public_docs/MIGRATION.md).
 
 ---
 
@@ -191,7 +190,7 @@ Current: **1.0.0** — SemVer-stable through the 1.x line. Tool names, argument 
 
 Recent releases:
 
-- **1.0.0** — *graduation*: family alignment, API path migration, governance layer, MCP prompts + resources, PolyForm relicense. (This release.)
+- **1.0.0** — *graduation*: family alignment, API path migration, governance layer, MCP prompts + resources, BSL 1.1 relicense. (This release.)
 - **0.3.1** — *cleanup*: examples folder, dead code removal, docs reorg.
 - **0.3.0** — analytical querying, deterministic summaries, TTL cache, configurable caps.
 - **0.2.0** — metadata, discovery, profiling extensions, mock mode.

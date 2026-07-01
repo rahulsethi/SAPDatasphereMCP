@@ -1,6 +1,6 @@
 <!-- SAP Datasphere MCP Server -->
 <!-- File: CHANGELOG.md -->
-<!-- Version: v4 -->
+<!-- Version: v5 -->
 
 # Changelog
 
@@ -21,7 +21,7 @@ repository root is the canonical changelog.
 - **MCP Resources (4)** — URI-addressable catalog content under `datasphere://space/{id}` and three nested forms. First SAP MCP server to ship resources.
 - **MCP tool annotations** (`readOnlyHint`/`idempotentHint`/`destructiveHint`) on every tool. Every tool is `readOnly`; none are `destructive`.
 - **Governance layer ported from sibling SAPBDCMCP**: `audit.py` (JSONL audit log), `policy.py` + `policy_evidence.py` (SAP API Policy v4/2026 gate + disclosure), `redaction.py` (secret/PII scrubbing), `tools/_metadata.py` (per-tool risk metadata), `tools/_gated.py` (interceptor chain).
-- **Optional mTLS-bound OAuth client_credentials** via IAS — set `DATASPHERE_OAUTH_MTLS_CERT` + `DATASPHERE_OAUTH_MTLS_KEY`.
+- **mTLS-bound OAuth client_credentials (Tier C) documented as a deployment posture** — `DATASPHERE_OAUTH_MTLS_CERT` / `DATASPHERE_OAUTH_MTLS_KEY` are recognized and reported by `datasphere_governance_api_policy_check`. Binding them into the OAuth token flow itself is on the roadmap and **not yet implemented** in `auth.py` (see the Deferred section).
 - **HTTP transport bearer auth** — set `DATASPHERE_MCP_BEARER_TOKEN`.
 - **`server.create_server()` factory** shared by both transports; `python -m sap_datasphere_mcp` works.
 - **npx distribution** — `npx-wrapper/` ships `@rahulsethi/sap-datasphere-mcp`, a Node bootstrap that probes uvx → pipx → python3 and forwards stdio.
@@ -34,7 +34,7 @@ repository root is the canonical changelog.
 ### Changed
 
 - **All 22 v0.3.x tool names** renamed to `datasphere_<category>_<verb>`. Old names remain registered as deprecation aliases through v1.1; aliases emit a one-time-per-process structured-log warning. See `public_docs/MIGRATION.md` for the full mapping table.
-- **PyPI distribution renamed** `mcp-sap-datasphere-server` → `sap-datasphere-mcp`. The console script name (`sap-datasphere-mcp`) and Python import path (`sap_datasphere_mcp`) are unchanged.
+- **PyPI distribution name retained** as `mcp-sap-datasphere-server`. (A planned rename to `sap-datasphere-mcp` was reverted — that short name is taken by an unrelated community package.) The console script `sap-datasphere-mcp` and Python import path `sap_datasphere_mcp` are unchanged; a `mcp-sap-datasphere-server` console-script alias was added so `uvx mcp-sap-datasphere-server` resolves the server.
 - **Default API path order** flipped: clients try `/api/v1/datasphere/...` first, falling back to `/api/v1/dwc/...` only on 404/405. Set `DATASPHERE_API_PATH_LEGACY=1` to revert.
 - **Python floor bumped** 3.10 → 3.11.
 - **`mcp` SDK pin bumped** `>=1.2.0` → `mcp[cli]>=1.25.0`. Added `python-dotenv>=1.0.1` and `jsonschema>=4.20.0` as deps.
@@ -50,7 +50,6 @@ repository root is the canonical changelog.
 
 ### Removed
 
-- The `mcp-sap-datasphere-server` PyPI name (replaced by `sap-datasphere-mcp`).
 - Python 3.10 support.
 
 ### Fixed
@@ -60,7 +59,7 @@ repository root is the canonical changelog.
 
 ### Licensing
 
-- **Relicensed from MIT to PolyForm Noncommercial 1.0.0** (v1.0+). Versions v0.3.1 and earlier remain MIT-licensed and are unaffected. Personal, research, academic, and internal evaluation use is free; commercial use requires a separate commercial license — see [`COMMERCIAL_LICENSING.md`](COMMERCIAL_LICENSING.md) for the friendly path. Same license arrangement as sibling [SAPBDCMCP](https://github.com/rahulsethi/SAPBDCMCP); 2-for-1 family discount available on request.
+- **Relicensed from MIT to the Business Source License 1.1 (BSL 1.1)** (v1.0+), which converts automatically to Apache 2.0 on 2029-01-01. Versions v0.3.1 and earlier remain MIT-licensed and are unaffected. Personal, research, academic, and internal evaluation use is free under the Additional Use Grant; commercial use requires a separate commercial license — see [`COMMERCIAL_LICENSING.md`](COMMERCIAL_LICENSING.md) for the friendly path. Same license arrangement as sibling [SAPBDCMCP](https://github.com/rahulsethi/SAPBDCMCP); 2-for-1 family discount available on request.
 
 ### Deferred (will land in 1.0.x / 1.1)
 
@@ -76,13 +75,12 @@ repository root is the canonical changelog.
 If you're upgrading from v0.3.x, see [`public_docs/MIGRATION.md`](public_docs/MIGRATION.md). Short version:
 
 ```bash
-pip uninstall mcp-sap-datasphere-server
-pip install sap-datasphere-mcp
-# or: uvx sap-datasphere-mcp
+pip install --upgrade mcp-sap-datasphere-server
+# or: uvx mcp-sap-datasphere-server
 # or: npx -y @rahulsethi/sap-datasphere-mcp
 ```
 
-Old tool names continue to work through v1.1 with deprecation logs. Update your Claude Desktop / Cursor configs before v1.2.
+The PyPI distribution name is unchanged (`mcp-sap-datasphere-server`) — just upgrade in place. Old tool names continue to work through v1.1 with deprecation logs. Update your Claude Desktop / Cursor configs before v1.2.
 
 ---
 

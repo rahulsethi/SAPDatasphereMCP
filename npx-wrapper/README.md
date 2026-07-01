@@ -32,8 +32,8 @@ easy to wire up. This wrapper lets users get started with one line:
 
 On invocation, the wrapper picks the first available Python launcher from:
 
-1. `uvx sap-datasphere-mcp` — recommended (`uv` is the fastest path)
-2. `pipx run sap-datasphere-mcp`
+1. `uvx mcp-sap-datasphere-server` — recommended (`uv` is the fastest path)
+2. `pipx run mcp-sap-datasphere-server`
 3. `python -m sap_datasphere_mcp` (or `python3` on POSIX)
 
 It then forwards stdio to the chosen process. SIGINT / SIGTERM / SIGHUP are
@@ -48,6 +48,6 @@ is on PATH, the wrapper exits non-zero with an actionable error.
 
 ## License
 
-PolyForm Noncommercial 1.0.0 — same terms as the Python package. See the
+Business Source License 1.1 (BSL 1.1) — same terms as the Python package. See the
 repository root [`LICENSE`](../LICENSE) and
 [`COMMERCIAL_LICENSING.md`](../COMMERCIAL_LICENSING.md).

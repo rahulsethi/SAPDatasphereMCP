@@ -7,7 +7,7 @@ This guide gets you from zero to "Claude is answering questions about my SAP Dat
 ## 1. Install
 
 ```bash
-uvx sap-datasphere-mcp
+uvx mcp-sap-datasphere-server
 ```
 
 That's it — `uvx` will fetch and run the latest version in an isolated environment. (Prefer `pip` or `npx`? See [INSTALLATION.md](./INSTALLATION.md).)
@@ -38,7 +38,7 @@ Open Claude Desktop → Settings → Developer → Edit Config, and add:
   "mcpServers": {
     "sap-datasphere": {
       "command": "uvx",
-      "args": ["sap-datasphere-mcp"]
+      "args": ["mcp-sap-datasphere-server"]
     }
   }
 }
